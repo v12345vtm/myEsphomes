@@ -1,0 +1,80 @@
+esphome:
+  name: regenpiezo
+  friendly_name: regenpiezo
+
+esp8266:
+  board: esp01_1m
+
+substitutions:
+  device_name: regenpiezo
+
+
+# Enable logging  https://mischianti.org/wp-content/uploads/2023/09/esp-01-esp8266-pinout-mischianti-low-res.jpg
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  #encryption:
+    #key: "Pm1a7+5oGvgDimpX9FhCrn71oUU/n9CuVloN8rSUsYk="
+
+web_server:
+  port : 80  
+
+
+ota:
+  - platform: esphome
+    password:  "fe389524746a8c5ef1a4d8c2cb07ccb3"
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password 
+
+      # Optional manual IP
+ 
+
+# boot switch between GPIO and GND
+#0  i/o pin werkt maar boot nie bij kortsl nr gnd (boot)
+#1 doet niet tellen maar doet led2 branden (tx)
+#2  i/o pin led blauw  (ledblauw)
+#3        (rx)
+   
+ 
+
+
+switch:
+  - platform: gpio
+    pin: GPIO2
+    name: "ESP01 Relay"
+    id: relay
+    restore_mode: ALWAYS_OFF
+    inverted: True
+
+binary_sensor:
+  - platform: gpio
+    pin: 
+      number: GPIO0
+      mode: INPUT_PULLUP
+    name: "Toggle Button"
+    on_press:
+      - switch.toggle: relay
+ 
+ 
+ 
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${device_name}_IP"    
+
+
+button:
+  - platform: restart
+    name: "Device Restart"
+    icon: "mdi:restart"
+ 
+ 
+ 

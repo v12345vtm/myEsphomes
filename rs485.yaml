@@ -1,0 +1,171 @@
+esphome:
+  name: rs485
+  friendly_name: RS485
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+ # level: VERBOSE
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "WJbe6zx0uFWhRLfFXIWION1f5BOiltZE3ugD0JtJc1A="
+
+ota:
+  - platform: esphome
+    password: !secret otapassword
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: NONE
+ 
+web_server:
+  port: 80
+ 
+
+uart:
+  id: mod_bus
+  tx_pin: 17
+  rx_pin: 16
+  baud_rate: 9600
+  stop_bits: 1
+  data_bits: 8
+  parity: none
+  debug: 
+  
+
+modbus:
+  id: modbus1
+  send_wait_time : 2s
+
+modbus_controller:
+  - id: kwhmeter
+    ## the Modbus device addr
+    address: 0x2
+    modbus_id: modbus1
+    update_interval: 5s
+
+ 
+
+
+ 
+     
+sensor:
+## 1 Total Energy (kWh)      adres 0x5000  holding  u_qword zend 02 03 50 00 00 04 crc 55 3a
+#float is 4bytes32bit
+## wat wil ik 02 03 00 00 00 04 crc 44 3a  en met modbuspoll is dat dan 03readholdingregisters04  quantity4  register0 modbusadres2
+
+ 
+# https://www.phoenixcontact.com/en-be/products/measuring-instrument-eem-em357-ee-1311985
+
+
+
+  - platform: modbus_controller
+    modbus_controller_id: kwhmeter
+    name: "09esp  = 10 krijgen holding"
+    address: 9 #=modbus400..
+    register_type: holding
+    value_type:  U_WORD 
+    device_class: "energy"
+    unit_of_measurement: "kWh"
+    accuracy_decimals: 0
+    state_class: "total_increasing"  
+
+
+  - platform: modbus_controller
+    modbus_controller_id: kwhmeter
+    name: "10esp = 11krijgen holding= 40011-uword toont 16448"
+    address: 10 #=modbus40011
+    register_type: holding
+    value_type:  U_WORD 
+    device_class: "energy"
+    unit_of_measurement: "kWh"
+    accuracy_decimals: 0
+    state_class: "total_increasing"
+
+  - platform: modbus_controller
+    modbus_controller_id: kwhmeter
+    name: "11esp = 12krijgen holding"
+    address: 11 #=modbus400..
+    register_type: holding
+    value_type:  U_WORD 
+    device_class: "energy"
+    unit_of_measurement: "kWh"
+    accuracy_decimals: 0
+    state_class: "total_increasing"    
+
+
+  - platform: modbus_controller
+    modbus_controller_id: kwhmeter
+    name: "12esp = 13krijgen holding"
+    address: 12 #=modbus400..
+    register_type: holding
+    value_type:  U_WORD 
+    device_class: "energy"
+    unit_of_measurement: "kWh"
+    accuracy_decimals: 0
+    state_class: "total_increasing"      
+ 
+
+ ##########################
+
+
+  - platform: modbus_controller
+    modbus_controller_id: kwhmeter
+    name: "02 demand period(default60)"
+    address: 2 #=modbus40003
+    register_type: holding
+    value_type:  FP32 
+    device_class: "energy"
+    unit_of_measurement: "min"
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: kwhmeter
+    name: "10 sysyeem 123fases"
+    address: 10 #=modbus40011
+    register_type: holding
+    value_type:  FP32 
+    device_class: "energy"
+    unit_of_measurement: ""
+    accuracy_decimals: 0
+
+
+  - platform: modbus_controller
+    modbus_controller_id: kwhmeter
+    name: "12 pulsewidh (default100ms)"
+    address: 12 #=modbus40013
+    register_type: holding
+    value_type:  FP32
+    device_class: "energy"
+    unit_of_measurement: "ms"
+    accuracy_decimals: 0
+
+
+  - platform: modbus_controller
+    modbus_controller_id: kwhmeter
+    name: "slaveid nr"
+    address: 20 #=modbus40021
+    register_type: holding
+    value_type:  FP32 
+    device_class: "energy"
+    unit_of_measurement: "ID"
+    accuracy_decimals: 0
+
+
+
+output:
+  - platform: modbus_controller
+    modbus_controller_id: kwhmeter
+    id  : zend
+    address: 2
+    value_type: FP32
+    write_lambda: |-
+        return 60;    
+
+ 

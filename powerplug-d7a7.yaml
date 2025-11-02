@@ -1,0 +1,220 @@
+esphome:
+  name: powerplug-d7a7
+  friendly_name: BBOXPowerPlug
+
+
+bk72xx:  #wb2s maar er staat op de chip CB2S !! is BK7132T maar je kan em niet softarematig bricken 
+  board: wb2s  ## Ltchiptool zegt dat er crc en timout error is maar het is toch gelukt
+
+# https://docs.libretiny.eu/boards/wb2s/wb2s.svg
+
+substitutions:
+  relaisA : "BboxVoeding"  # ${relaisA} verst van knop 
+  integratedbutton : "Button"  # ${integratedbutton}
+  integratedled : "Wifi (blue)"  # ${integratedled} (blauw knippert als hij offline is)
+  relaistatusled : "Led (red)"  # ${relaistatusled} (rood knippert als hij offline is)
+
+  gpiorelaisA : "GPIO8"  # ${gpiorelaisA} 
+  gpiointegratedled : "GPIO26"  # ${gpiointegratedled}
+  gpiorelaistatusled: "GPIO6"  # ${gpiorelaistatusled}
+  gpiointegratedbutton: "GPIO7"  # ${gpiointegratedbutton}
+ 
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "t2O6akJ/5vBGP/kWYiQGSkF+doOG0Jhh1SxsUwee6n0="
+
+ota:
+  - platform: esphome
+    password: "1d499c47696dc70965ef2c580a13e3ff"
+
+# Turn off the light when WiFi connects
+wifi:
+  fast_connect: True  
+  on_connect:
+    then:
+      - light.turn_on: integratedled
+      - delay: 2500ms
+      - light.turn_off: integratedled
+       
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "BBOX_Powerplug-D7A7-nr1"
+    password: "kipkipkip"
+
+captive_portal:
+
+web_server:
+  js_include: "esphomecss/www.js"
+  js_url: ""
+  version: 2
+
+button:
+  - platform: restart
+    name: "Device Restart"
+    entity_category: diagnostic
+    icon: mdi:restart
+
+#button:
+  - platform: template
+    name: "toggle ${relaisA}"
+    id: omschakelen_relaisA
+    icon: "mdi:toggle-switch"
+    on_press:
+      then:
+        - switch.toggle: relaisA
+
+#button:
+  - platform: template
+    name: "reset ${relaisA}"
+    id: resetbbox
+    icon: "mdi:timer-3"
+    on_press:
+      then:
+        -  switch.turn_off: relaisA
+        -  delay: 3s
+        -  switch.turn_on : relaisA
+            
+      
+
+switch:
+ 
+
+  - platform: gpio
+    pin: ${gpiorelaisA} 
+    id: relaisA #dit is onze fysyke relais
+    name: ${relaisA}
+    inverted: False
+    icon: "mdi:power-socket-eu"
+    restore_mode  : ALWAYS_ON  
+
+
+
+output:
+  - platform: gpio
+    pin: ${gpiointegratedled}  #heeft de blaue led in de button wifi status
+    id: led_outputbl
+    inverted: False  
+
+  - platform: gpio
+    pin: ${gpiorelaistatusled}  #heeft de roode led in de button relay status
+    id: led_outputrd
+    inverted: False  
+
+light:
+  - platform: binary
+    name: ${integratedled}
+    output: led_outputbl
+    id : integratedled
+    icon : "mdi:led-off"
+
+  - platform: binary
+    name: ${relaistatusled}
+    output: led_outputrd
+    id : relaistatusled 
+    icon : "mdi:led-off"
+
+  
+
+ 
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: ${gpiointegratedbutton}
+      inverted: true
+      mode: INPUT_PULLUP
+    name: ${integratedbutton}
+    id : integratedbutton # This is our physical button built into the power strip
+    on_click:
+      min_length: 10ms
+      max_length: 500ms
+      then:
+        - button.press: omschakelen_relaisA
+ 
+
+
+
+
+
+
+
+
+# Create an interval to check WiFi status and control the light
+interval:
+  - interval: 300ms
+    then:
+      if:
+        condition:
+          not:
+            wifi.connected:
+        then:
+          - light.toggle: integratedled
+
+
+  - interval: 60s
+    then:
+      - logger.log:
+          format: "Current time: %02d:%02d:%02d"
+          args: [id(sntp_time).now().hour, id(sntp_time).now().minute, id(sntp_time).now().second]
+          level: INFO
+# Time component using NTP
+time:
+  - platform: sntp
+    id: sntp_time
+    servers:
+      - pool.ntp.org
+      - 0.pool.ntp.org
+      - 1.pool.ntp.org
+    timezone: "Europe/Brussels"
+
+
+# Log when time is synchronized
+ 
+    on_time_sync:
+      then:
+        - logger.log: "Time synchronized with NTP server"
+
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal Strength dBm"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+    internal: True
+
+  - platform: copy
+    source_id: wifi_signal_db
+    name: "WiFi Signal Strength Percentage"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+    device_class: ""
+
+
+
+#sensor:
+  - platform: internal_temperature
+    name: "Internal Temperature"    
+    #filters: 
+    #- calibrate_linear:
+    #  - 0.0 -> 0.0
+    #  - 13.0 -> 18.6 
+
+
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP" 
+    mac_address:
+      name: "mac"

@@ -1,0 +1,215 @@
+esphome:
+  name: lscwit
+  friendly_name: LscWit
+  on_boot:
+    then:
+      - light.control: 
+          id: the_light
+          #brightness: 70%
+          cold_white: 60%
+          warm_white: 50%
+          #transition_length: 0s
+  #    - light.control: 
+  #        id: warm
+  #        brightness: 50%
+          
+
+bk72xx:
+  board: generic-bk7231t-qfn32-tuya
+
+# Enable logging
+logger:
+
+
+# https://devices.esphome.io/devices/LSC-Light-White-Ambiance-3000272
+#Pin	Function https://devices.esphome.io/devices/LSC-Led-Filament-Smart-3200074
+#P26	Cold White (PWM)
+#P24	Warm White (PWM)  
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "PpnlOqVI2Q297UGQU63Liy17qHM0s995XrhvUcOR0nQ="
+
+web_server:
+  js_include: "esphomecss/www.js"
+  js_url: ""
+  version: 2
+  
+ota:
+  - platform: esphome
+    password: "26e1c75e17662f21a09ac357e9628da4"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Lscwit Fallback Hotspot"
+    password: "kipkipkip"
+
+captive_portal:
+    
+
+
+output:
+  - platform: libretiny_pwm
+    id: output_cold_white
+    pin: P24
+  - platform: libretiny_pwm
+    id: output_warm_white
+    pin: P26 
+
+
+ 
+
+# Example usage in a light
+light:
+  - platform: monochromatic
+    output: output_cold_white
+    name: "output_cold_white"  
+    id : koud 
+    #restore_mode: ALWAYS_ON 
+    internal: True
+
+  - platform: monochromatic
+    output: output_warm_white
+    name: "output_warm_white"    
+    id : warm
+    #restore_mode: ALWAYS_ON
+    internal: True
+
+
+
+
+# Example configuration entry
+#light:
+  - platform: cwww
+    name: "lscwit"
+    id: the_light
+    restore_mode: ALWAYS_ON
+    cold_white: output_cold_white
+    warm_white: output_warm_white
+    cold_white_color_temperature: 6536 K
+    warm_white_color_temperature: 2000 K
+    constant_brightness: true
+    effects:
+      - random:
+          name: "Slow Random"
+          transition_length: 30s
+          update_interval: 30s
+      - random:
+          name: "Fast Random"
+          transition_length: 2s
+          update_interval: 5s
+      - strobe:
+      - flicker:
+          alpha: 50% #The percentage that the last color value should affect the light. More or less the “forget-factor” of an exponential moving average. Defaults to 95%.
+          intensity: 50% #The intensity of the flickering, basically the maximum amplitude of the random offsets. Defaults to 1.5%.
+      - lambda:
+          name: Throb
+          update_interval: 1s
+          lambda: |-
+            static int state = 0;
+            auto call = id(the_light).turn_on();
+            // Transtion of 1000ms = 1s
+            call.set_transition_length(1000);
+            if (state == 0) {
+              call.set_brightness(1.0);
+            } else {
+              call.set_brightness(0.01);
+            }
+            call.perform();
+            state += 1;
+            if (state == 2)
+              state = 0;
+
+
+
+      - lambda:
+          name: gpt
+          update_interval: 100ms
+          lambda: |-
+            static float brightness = 0.0;
+            static float step = 0.05;
+            auto call = id(the_light).turn_on();
+            call.set_transition_length(100);
+            call.set_brightness(brightness);
+            call.perform();
+            brightness += step;
+            if (brightness >= 1.0 || brightness <= 0.0) {
+              step = -step;
+            }
+
+ 
+ 
+
+
+
+## Blink the light if we aren't connected to WiFi.
+## Uncomment below
+#interval:
+#- interval: 500ms
+#  then:
+#  - if:
+#      condition:
+#        not:
+#          wifi.connected:
+#      then:
+#        - light.turn_on:
+#            id: the_light
+#            brightness: 50%
+#            transition_length: 0s
+#        - delay: 250ms
+#        - light.turn_off:
+#            id: the_light
+#            transition_length: 250ms
+
+
+
+# Add a button for rebooting the device
+button:
+  - platform: restart
+    name: "Reboot LSC Filament Smart"
+
+  - platform: template
+    id: gezellig
+    name: gezellig
+    on_press: 
+      then :
+      - light.control: 
+          id: the_light
+          #brightness: 70%
+          cold_white: 20%
+          warm_white: 50%
+
+  - platform: template
+    id: solderen
+    name: solderen
+    on_press: 
+      then : 
+      - light.control: 
+          id: the_light
+          #brightness: 70%
+          cold_white: 100%
+          warm_white: 0%          
+
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP" 
+    mac_address:
+      name: "mac" 
+ 
+
+
+sensor:
+  - platform: internal_temperature
+    name: "Living_Temperature"  
+    filters: 
+    - calibrate_linear:
+      - 0.0 -> 0.0
+      - 12.6 -> 18.6   
+

@@ -1,0 +1,294 @@
+#ESP32 Pin            |  PCM5102 Pin  |  Function    
+# --------------------+---------------+--------------
+# GPIO 15             |  LCK / LRCK   |  Word select 
+# GPIO 12             |  BCK   / BCLK |  Bit clock   
+# GPIO 33  (485_EN)   |  XSMT         |  Mute control i2s module
+# GPIO 14             | Dout /DIN     | digital audio out
+# 3.3V                |  VCC          |  Power   dac    
+# GND                 |  GND          |  Ground    dac  
+# GPIO 32  (CFG)      |  IR LEd       | pioneer a702r remote
+
+
+#  https://github.com/v12345vtm/VintagePioneerIR/tree/main
+#  https://www.hackerspace-ffm.de/wiki/images/WT32-ETH01_pinout_LL.png
+
+esphome:
+  name: wt32sonos
+  friendly_name: WT32Sonos
+  on_boot: 
+    then:
+      - delay: 3s
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+#  level: ERROR
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret apikey
+
+ota:
+  - platform: esphome
+    password: !secret otapassword
+
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk:
+    pin: GPIO0
+    mode: CLK_EXT_IN   # or CLK_OUT depending on your board specs
+  phy_addr: 1
+  power_pin: GPIO16
+  id: eth
+
+# Example configuration entry  sd(data of dout of din) 32     ws 15 (Clk of lrck )      sck 14 (Blck )       master niet
+i2s_audio:
+  i2s_lrclk_pin: GPIO15
+  i2s_bclk_pin: GPIO12
+
+remote_transmitter:
+  pin: GPIO32  # IMPORTANT: Change this to the GPIO pin your IR LED is connected to.  
+  carrier_duty_percent: 50% # Standard for most IR protocols
+
+  
+
+media_player:
+  - platform: i2s_audio
+    name: WT32Sonos
+    dac_type: external
+    i2s_dout_pin: GPIO14
+    mode: stereo
+    id: i2s_player
+    on_state:
+      - if:
+          condition:
+            media_player.is_paused: i2s_player
+          then:
+            - switch.turn_on: mute_switch
+          else:
+            - switch.turn_off: mute_switch
+
+      - if:
+          condition:
+            media_player.is_playing: i2s_player
+          then:
+            - switch.turn_off: mute_switch
+
+    on_idle:
+      - delay: 105s
+      - if:
+          condition:
+            media_player.is_idle: i2s_player
+          then:
+            - switch.turn_off: mute_switch
+
+
+# Define a mute/unmute switch
+switch:
+  - platform: gpio
+    pin: GPIO33
+    name: "Mute"
+    id: mute_switch
+    restore_mode: RESTORE_DEFAULT_OFF
+    icon: mdi:volume-off
+    inverted: True
+
+
+web_server:
+  port: 80
+
+ 
+
+
+
+text:
+  - platform: template
+    name: "Radio URL"
+    id: radio_url
+    optimistic: true
+    mode: text
+    initial_value: "http://icecast.vrtcdn.be/ra2wvl-mid.mp3"
+    on_value:
+      - logger.log:
+          format: "New stream URL set to: %s"
+          args: [x.c_str()]
+
+button:
+  - platform: template
+    name: "Play Radio"
+    id: play_radio_button
+    icon: "mdi:radio"
+    on_press:
+      - logger.log: "Play button pressed"
+      - media_player.volume_set:
+          id: i2s_player
+          volume: 0.6
+      - delay: 0.1s
+      - media_player.play_media:
+          id: i2s_player
+          media_url: !lambda 'return id(radio_url).state;'
+
+
+#button: 
+  - platform: template
+    name: radio2
+    id: radio2drukknop
+    icon: "mdi:emoticon-outline"
+    on_press:
+      - logger.log: "radio 2 pressed" 
+      - media_player.volume_set:
+          id: i2s_player
+          volume: 0.6
+      - delay: 0.1s
+      - media_player.play_media:
+          id: i2s_player
+          media_url: "http://icecast.vrtcdn.be/ra2wvl-mid.mp3"    
+
+
+
+#button:
+  - platform: restart
+    name: "Reboot Device"
+    entity_category: "diagnostic"
+    icon: "mdi:restart"
+
+
+
+  - platform: template
+    name:  "Volume Up"  #"jaPioneer SX-205RDS Volume Up"
+    icon: "mdi:volume-plus"
+    id : vol_up 
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38000Hz
+          repeat: 2
+          code: [
+            8550, -4250, 550, -1575, 550, -525, 550, -1575,
+            550, -525, 550, -525, 525, -1600, 550, -525, 525, -1600,
+            550, -525, 525, -1600, 550, -525, 525, -1600, 550, -1575,
+            550, -525, 550, -1575, 550, -525, 550, -525, 525, -1600,
+            550, -525, 525, -1600, 550, -525, 525, -525, 550, -525,
+            550, -525, 525, -1600, 550, -525, 525, -1600, 550, -525,
+            525, -1600, 550, -1575, 550, -1600, 525, -1600, 550, -25450          ]
+
+  - platform: template
+    name: "Volume Down" #"jaPioneer SX-205RDS Volume Down"
+    icon: "mdi:volume-minus"
+    id : vol_min
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38000Hz
+          repeat: 2
+          code: [
+            8525, -4250, 550, -1600, 525, -550, 550, -1600, 525, -525,
+            550, -525, 550, -1575, 550, -525, 550, -1575, 550, -525,
+            550, -1575, 550, -525, 550, -1575, 550, -1600, 525, -525,
+            550, -1600, 525, -525, 550, -1600, 525, -1600, 550, -525,
+            525, -1600, 550, -525, 525, -525, 550, -525, 550, -525,
+            525, -525, 550, -525, 550, -1575, 550, -525, 550, -1575,
+            550, -1600, 525, -1600, 550, -1575, 550, -25425, 8525, -4250,
+            550, -1600, 525, -525          ]
+
+  - platform: template
+    name: "Power" #ja CU-SX148 power
+    icon: "mdi:power"
+    id : amp_power
+    on_press:
+      - remote_transmitter.transmit_raw:
+          carrier_frequency: 38000Hz
+          repeat: 2
+          code: [
+            8500, -4250, 550, -1600, 550, -550, 550, -1600, 550, -550,
+            550, -550, 550, -1600, 550, -550, 550, -1600, 550, -550,
+            550, -1600, 550, -550, 550, -1600, 550, -1600, 550, -550,
+            550, -1600, 550, -550, 550, -550, 550, -550, 550, -1575,
+            550, -1600, 550, -1600, 550, -550, 550, -550, 550, -550,
+            550, -1575, 550, -1600, 550, -550, 550, -550, 550, -550,
+            550, -1600, 550, -1575, 550, -1600, 550, -64000          ]
+#button:
+  - platform: template
+    name:  "Mute"   #"ja mute x305"
+    icon: "mdi:volume-off"
+    id : mute
+    on_press:
+      - remote_transmitter.transmit_raw:
+          repeat: 2
+          carrier_frequency: 40244Hz
+          code: [8473, -4249, 521, -1590, 546, -521, 521, -1590, 546, -521, 521, -521, 546, -1590, 521, -521, 546, -1590, 521, -521, 546, -1590, 521, -521, 546, -1590, 521, -1590, 546, -521, 521, -1590, 546, -521, 521, -521, 546, -1590, 521, -521, 546, -521, 546, -1565, 546, -521, 546, -521, 521, -521, 546, -1590, 521, -521, 546, -1590, 521, -1590, 546, -521, 521, -1590, 546, -1565, 546, -1590, 521, -25320]
+    
+  - platform: template
+    name: "Pioneer Mute"
+    on_press:
+      - remote_transmitter.transmit_pronto:
+          repeat : 2
+          data: '0000 0067 0000 0022 0155 00ab 0015 0040 0016 0015 0015 0040 0016 0015 0015 0015 0016 0040 0015 0015 0016 0040 0015 0015 0016 0040 0015 0015 0016 0040 0015 0040 0016 0015 0015 0040 0016 0015 0015 0015 0016 0040 0015 0015 0016 0015 0016 003f 0016 0015 0016 0015 0015 0015 0016 0040 0015 0015 0016 0040 0015 0040 0016 0015 0015 0040 0016 003f 0016 0040 0015 03fb'
+
+  - platform: template
+    name: "nee mdtape1"
+    icon: "mdi:cassette"
+    id : tape1
+    on_press:
+      - remote_transmitter.transmit_pronto:
+          repeat: 2
+          data: >
+            0000 006d 0000 0022 0155 00ac 0015 0040 0015 0015 0015 0040 0015 0015 0015 0015 0015 0040 0015 0015 0015 0040 0015 0015 0015 0040 0015 0015 0015 0040 0015 0040 0015 0015 0015 0040 0015 0015 0015 0040 0015 0015 0015 0015 0015 0015 0015 0040 0015 0015 0015 0015 0015 0015 0015 0015 0015 0040 0015 0040 0015 0040 0015 0015 0015 0040 0015 0040 0015 0040 0015 0594
+
+  - platform: template
+    name: "Tape2"
+    id : tape2
+    icon: "mdi:cassette"
+    on_press:
+      - remote_transmitter.transmit_pronto:
+          repeat: 2
+          data: >
+            0000 006d 0000 0022 0155 00ac 0015 0040 0015 0015 0015 0040 0015 0015 0015 0015 0015 0040 0015 0015 0015 0040 0015 0015 0015 0040 0015 0015 0015 0040 0015 0040 0015 0015 0015 0040 0015 0015 0015 0040 0015 0015 0015 0040 0015 0040 0015 0040 0015 0015 0015 0015 0015 0015 0015 0015 0015 0040 0015 0015 0015 0015 0015 0015 0015 0040 0015 0040 0015 0040 0015 0594
+
+  - platform: template
+    name: "CD"  # "ja xls cd"
+    icon: "mdi:disc"
+    id : cd
+    on_press:
+      - remote_transmitter.transmit_pronto:
+          repeat: 2
+          data: >
+            0000 0067 0000 0022 0158 00A6 0015 0041 0015 0016 0015 0041 0015 0016 0015 0016 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0041 0015 0016 0015 0041 0015 0016 0015 0016 0015 0016 0015 0041 0015 0041 0015 0016 0015 0016 0015 0041 0015 0016 0015 0041 0015 0041 0015 0016 0015 0016 0015 0041 0015 0041 0015 0016 0015 0041 0015 040F
+
+  - platform: template
+    name:  "Line-in"  #"ja xls line" #aux xlsx
+    icon: "mdi:cable-data"
+    id : line_in
+    on_press:
+      - remote_transmitter.transmit_pronto:
+          repeat: 2
+          data: >
+            0000 0067 0000 0022 0158 00A6 0015 0041 0015 0016 0015 0041 0015 0016 0015 0016 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0041 0015 0041 0015 0041 0015 0016 0015 0016 0015 0041 0015 0016 0015 0016 0015 0016 0015 0016 0015 0016 0015 0041 0015 0041 0015 0016 0015 0041 0015 040F
+
+  - platform: template
+    name: "Tuner" #"ja xlsx tuner"
+    icon: "mdi:radio"
+    id : tuner
+    on_press:
+      - remote_transmitter.transmit_pronto:
+          repeat: 2
+          data: >
+            0000 0067 0000 0022 0158 00A6 0015 0041 0015 0016 0015 0041 0015 0016 0015 0016 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0041 0015 0041 0015 0016 0015 0016 0015 0016 0015 0041 0015 0016 0015 0016 0015 0016 0015 0016 0015 0041 0015 0041 0015 0041 0015 0016 0015 0041 0015 040F
+
+  - platform: template
+    name: "Phono" #via xls bestand
+    icon: "mdi:album"
+    id : phono
+    on_press:
+      - remote_transmitter.transmit_pronto:
+          repeat: 2
+          data: >
+            0000 0067 0000 0022 0158 00A6 0015 0041 0015 0016 0015 0041 0015 0016 0015 0016 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0016 0015 0041 0015 0041 0015 0016 0015 0016 0015 0041 0015 0016 0015 0016 0015 0041 0015 0016 0015 0016 0015 0041 0015 0041 0015 0016 0015 0041 0015 040F
+
+

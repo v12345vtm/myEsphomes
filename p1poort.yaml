@@ -1,0 +1,178 @@
+esphome:
+  name: p1poort
+  friendly_name: P1poort
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+
+substitutions:
+  device_name: p1reader      
+
+# Enable logging
+logger:
+
+dsmr:
+  #request_pin: 6
+  request_interval: 15s
+
+uart:
+  rx_pin: 16
+  baud_rate: 115200
+  rx_buffer_size: 1500 
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "wl95psPLzot2vFMalgS+XOsSwUrj20uPmpetzd47ulM="
+
+
+ota:
+  - platform: esphome
+    password:  "b7da8d7479e1aaf916d49671ab7bd68e"
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password 
+  - ssid: !secret wifi_ssid3
+    password: !secret wifi_password  
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "P1Poort Fallback Hotspot"
+    password: "kipkipkip"
+
+captive_portal:
+    
+web_server:
+  js_include: "esphomecss/www.js"
+  js_url: ""
+  version: 2   
+
+switch:
+  - platform: restart
+    name: ${device_name}_restart  
+
+ 
+
+sensor:
+ 
+
+  - platform: dsmr
+    energy_delivered_tariff1:
+      name: "Energy Consumed Tariff 1"
+    energy_delivered_tariff2:
+      name: "Energy Consumed Tariff 2"
+    energy_returned_tariff1:
+      name: "Energy Produced Tariff 1"
+    energy_returned_tariff2:
+      name: "Energy Produced Tariff 2"
+    power_delivered:
+      name: "Power Consumed"
+      accuracy_decimals: 3
+    power_returned:
+      name: "Power Produced"
+      accuracy_decimals: 3
+    electricity_failures:
+      name: "Electricity Failures"
+      icon: mdi:alert
+    electricity_long_failures:
+      name: "Long Electricity Failures"
+      icon: mdi:alert
+    voltage_l1:
+      name: "Voltage Phase 1"
+    voltage_l2:
+      name: "Voltage Phase 2"
+    voltage_l3:
+      name: "Voltage Phase 3"
+    current_l1:
+      name: "Current Phase 1"
+    current_l2:
+      name: "Current Phase 2"
+    current_l3:
+      name: "Current Phase 3"
+    power_delivered_l1:
+      name: "Power Consumed Phase 1"
+      accuracy_decimals: 3
+    power_delivered_l2:
+      name: "Power Consumed Phase 2"
+      accuracy_decimals: 3
+    power_delivered_l3:
+      name: "Power Consumed Phase 3"
+      accuracy_decimals: 3
+    power_returned_l1:
+      name: "Power Produced Phase 1"
+      accuracy_decimals: 3
+    power_returned_l2:
+      name: "Power Produced Phase 2"
+      accuracy_decimals: 3
+    power_returned_l3:
+      name: "Power Produced Phase 3"
+      accuracy_decimals: 3
+    gas_delivered:
+      name: "Gas Consumed"     
+
+
+
+
+### use if you populate the water meter stuff :)
+  - platform: pulse_meter
+    pin: 
+      number: GPIO05
+      mode:
+        input: true
+        pullup: true
+    name: "Water Liter Meter"
+    unit_of_measurement: "liter/min"
+    icon: "mdi:water"
+    disabled_by_default: true
+    total:
+      name: "Water Meter Total" 
+      unit_of_measurement: "m³"
+      id: water_meter_total_esp
+      accuracy_decimals: 3
+      device_class: water
+      state_class: total_increasing
+      filters:
+        - multiply: 0.001
+
+  - platform: template
+    name: "Water Usage Total"
+    id: water_usage_total_esp
+    accuracy_decimals: 0
+    unit_of_measurement: "liter"
+    icon: "mdi:water"
+    device_class: water
+    state_class: total_increasing
+    lambda: return (id(water_meter_total_esp).state * 1000);
+    update_interval: 10s
+   
+     
+
+text_sensor:
+  - platform: dsmr
+    identification:
+      name: "DSMR Identification"
+    p1_version:
+      name: "DSMR Version"    
+
+#text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${device_name}_IP"
+ 
+ 
+    mac_address:
+      name: "${device_name}_mac"
+ 
+
+  
+    ssid:
+      name: "${device_name}_ssid"
+
+

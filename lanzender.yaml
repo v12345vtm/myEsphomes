@@ -1,0 +1,214 @@
+esphome:
+  name: lanzender
+  friendly_name: lanzender
+#https://github.com/v12345vtm/webrelais-webinput
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+
+substitutions:
+  knopveertien : "A relay 14a spoel"  # ${knopveertien}
+  knopvijftien : "A relay 15a spoel" # ${knopvijftien}
+  knopvier : "B relay 14b spoel" # ${knoptwee}
+  knoptwee : "B relay 15b spoel" # ${knopvier}
+
+  knopveertientm : "A relay 14a switch"  # ${knopveertien}
+  knopvijftientm : "A relay 15a switch" # ${knopvijftien}
+  knopviertm : "B relay 14b switch" # ${knoptwee}
+  knoptweetm : "B relay 15b switch" # ${knopvier}
+
+# Enable Home Assistant API
+#api:
+#  encryption:
+#    key: "mkwhArJIHvLLtkw+bZj9rndSOOBEWs7q/KY5rhcVfAQ="
+# Enable Home Assistant API
+api:
+  reboot_timeout: 0s #we werken zonder homeassistant en anders reboot de esp na 15minuten
+  
+
+ota:
+  - platform: esphome
+    password: "bc3813fa98e6d2d9b271924c4548192b"
+
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO0_IN
+  phy_addr: 1
+  power_pin: GPIO16
+
+
+#wifi:
+#  ssid: !secret wifi_ssid
+#  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+#  ap:
+#    ssid: "Lanzender Fallback Hotspot"
+#    password: "kipkipkip"
+
+#captive_portal:
+
+web_server:
+  js_include: "esphomecss/www.js"
+  js_url: ""
+  version: 2
+
+button:
+  - platform: restart
+    name: "Restart Device"
+    entity_category: diagnostic
+    icon: mdi:restart
+
+ 
+     
+ 
+
+udp:
+  update_interval: 10ms
+  binary_sensors:
+    - knop14
+    - knop15
+    - knop2
+    - knop4
+
+ 
+#binarysensors voor eigen gebruik op de zender
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO14
+      inverted: True
+      mode: INPUT_PULLUP
+    name: ${knopveertien}
+    id : knop14 #dit is onze fysike knop 
+
+  - platform: template
+    name: ${knopveertientm}_A
+    id: knop14tm_ontvangera #dit dient om status vd remote webrealais te tonen , die kan overruled zijn als je de webrelais op de ontvanger manueel bedient via zijn eigen webinterface
+    lambda: "return id(relay14a_tm).state;"
+##########################
+
+
+#binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO15
+      inverted: True
+      mode: INPUT_PULLUP
+    name: ${knopvijftien}
+    id : knop15 #dit is onze fysike knop 
+
+  - platform: template
+    name: ${knopvijftientm}_A
+    id: knop15tm_ontvangera #dit dient om status vd remote webrealais te tonen , die kan overruled zijn als je de webrelais op de ontvanger manueel bedient via zijn eigen webinterface
+    lambda: "return id(relay15a_tm).state;"
+##########################
+
+
+
+#binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO4
+      inverted: True
+      mode: INPUT_PULLUP
+    name: ${knopvier}
+    id : knop4 #dit is onze fysike knop 
+
+  - platform: template
+    name: ${knopviertm}_B
+    id: knop4tm_ontvangerb #dit dient om status vd remote webrealais te tonen , die kan overruled zijn als je de webrelais op de ontvanger manueel bedient via zijn eigen webinterface
+    lambda: "return id(relay14b_tm).state;"
+##########################
+
+#binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO2
+      inverted: True
+      mode: INPUT_PULLUP
+    name: ${knoptwee}
+    id : knop2 #dit is onze fysike knop 
+
+  - platform: template
+    name: ${knoptweetm}_B
+    id: knop2tm_ontvangerb #dit dient om status vd remote webrealais te tonen , die kan overruled zijn als je de webrelais op de ontvanger manueel bedient via zijn eigen webinterface
+    lambda: "return id(relay15b_tm).state;"
+##########################
+
+
+
+
+
+#ontvanger A
+##binary sensors afkomstig vd ontvanger
+  - platform: udp
+    provider: lanontvangera
+    id: relay14a_tm #id van de tm vd onvanger
+    on_press:
+      - binary_sensor.template.publish:
+          id: knop14tm_ontvangera
+          state: ON
+    on_release:
+      - binary_sensor.template.publish:
+          id: knop14tm_ontvangera
+          state: OFF
+
+##binary sensors afkomstig vd ontvanger
+  - platform: udp
+    provider: lanontvangera
+    id: relay15a_tm #id van de tm vd onvanger
+    on_press:
+      - binary_sensor.template.publish:
+          id: knop15tm_ontvangera
+          state: ON
+    on_release:
+      - binary_sensor.template.publish:
+          id: knop15tm_ontvangera
+          state: OFF
+
+
+#####ontvanger B      
+##binary sensors afkomstig vd ontvanger
+  - platform: udp
+    provider: lanontvangerb
+    id: relay14b_tm #id van de tm vd onvanger
+    on_press:
+      - binary_sensor.template.publish:
+          id: knop4tm_ontvangerb
+          state: ON
+    on_release:
+      - binary_sensor.template.publish:
+          id: knop4tm_ontvangerb
+          state: OFF
+
+##binary sensors afkomstig vd ontvanger
+  - platform: udp
+    provider: lanontvangerb
+    id: relay15b_tm #id van de tm vd onvanger
+    on_press:
+      - binary_sensor.template.publish:
+          id: knop2tm_ontvangerb
+          state: ON
+    on_release:
+      - binary_sensor.template.publish:
+          id: knop2tm_ontvangerb
+          state: OFF
+
+
+
+
+############################
+#### pingen  A ################
+############################
+ 
+
+ 

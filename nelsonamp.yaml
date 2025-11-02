@@ -1,0 +1,253 @@
+esphome:
+  name: nelsonamp
+  friendly_name: NelsonAmp
+  on_boot:
+    then:
+      - switch.turn_on: mute
+      - media_player.volume_set:
+          id: i2s_player
+          volume: 0.5
+
+
+logger:
+         
+
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+#logger: 
+
+# Enable Home Assistant API   https://macsbug.wordpress.com/2021/02/19/web-radio-of-m5stack-pcm5102a-i2s-dac/
+api:
+
+
+#web_server:  #for debug only
+#  port: 80
+
+ota:
+  - platform: esphome
+    password: "572a01bf5def8d8f5fd5e0fdfaa519ed"
+
+wifi:
+  fast_connect: True  
+  power_save_mode: none
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  
+
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Nelsonamp Fallback Hotspot"
+    password: "kipkipkip"
+
+captive_portal:
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal Strength dBm"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+    internal: True
+
+  - platform: copy
+    source_id: wifi_signal_db
+    name: "WiFi Signal Strength Percentage"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+    device_class: ""
+
+
+
+button:
+  - platform: restart
+    name: "Nelsonamp restart"     
+
+
+
+
+remote_receiver:
+  pin :
+    number : GPIO18 #GPIO18 #12niet op pcb vrij
+    inverted : True
+  #dump: lg  
+ 
+#     0x20DFF10E
+#data=0x20DF0DF2, nbits=32
+# 0x20DF5DA2
+# 0x20DF718E
+
+binary_sensor:
+  - platform: remote_receiver
+    name: "lg_prev"
+    filters:
+      - delayed_off: 10ms
+    lg: 
+      data: 0x20DFF10E
+      nbits: 32
+    on_press:
+      then:
+       # - logger.log: "lgprev"
+       #- media_player.play_next  #pakt niet
+        
+
+
+  - platform: remote_receiver
+    name: "lgplay"
+    filters:
+      - delayed_off: 10ms
+    lg: 
+      data: 0x20DF0DF2
+      nbits: 32
+    on_press:
+      then:
+       # - logger.log: "lgplay"
+        - media_player.play
+
+
+  - platform: remote_receiver
+    name: "lgpauze"
+    filters:
+      - delayed_off: 10ms
+    lg: 
+      data: 0x20DF5DA2
+      nbits: 32
+    on_press:
+      then:
+      #  - logger.log: "lgpauze"
+        - media_player.pause
+
+
+  - platform: remote_receiver
+    name: "lgnext"
+    filters:
+      - delayed_off: 10ms
+    lg: 
+      data: 0x20DF718E
+      nbits: 32
+    on_press:
+      then:
+      #  - logger.log: "lgnext"
+      #   - media_player.play_next:            target: media_player.i2s_player
+       
+
+
+  - platform: remote_receiver
+    name: "lgvolup"
+    filters:
+      - delayed_off: 10ms
+    lg: 
+      data: 0x20DF40BF
+      nbits: 32
+    on_press:
+      then:
+      #  - logger.log: "lgvolup"
+        - media_player.volume_up          
+
+  - platform: remote_receiver
+    name: "lgvolmin"
+    filters:
+      - delayed_off: 10ms
+    lg: 
+      data: 0x20DFC03F
+      nbits: 32
+    on_press:
+      then:
+        #- logger.log: "lgvolmin"       
+        - media_player.volume_down
+
+
+
+
+# Define the buttons
+#binary_sensor:
+#  - platform: gpio
+#    pin: GPIO32
+#    name: "Volume Up"
+#    on_press:
+#      then:
+#       # - media_player.volume_up: i2s_player
+#  - platform: gpio
+#    pin: GPIO33
+#    name: "Volume Down"
+#    on_press:
+#      then:
+#     #   - media_player.volume_down: i2s_player    
+
+ 
+
+i2s_audio:
+  i2s_lrclk_pin: GPIO15
+  i2s_bclk_pin: GPIO4
+
+media_player:
+  - platform: i2s_audio
+    name: Voice Assistant Speaker
+    dac_type: external
+    i2s_dout_pin: GPIO14
+    mode: stereo  
+    id: i2s_player
+    on_state:
+      - if:
+          condition:
+            media_player.is_playing:
+          then:
+            - delay: 100ms
+            - switch.turn_off: mute
+      - if:
+          condition:
+            or:
+              - media_player.is_idle
+              - media_player.is_paused
+          then:
+            - switch.turn_on: mute  
+    
+
+output:
+  - platform: gpio
+    pin: GPIO5  ##2is de blauwe led
+    id: amp_mute_output
+    inverted: true
+    
+
+  - platform: gpio
+    pin: GPIO2  ##2is de blauwe led
+    id: amp_mute_led
+    inverted: False
+
+switch:
+  - platform: output
+    name: "Amp Mute"
+    output: amp_mute_output
+    id: mute
+    icon: mdi:volume-mute
+    on_turn_on:
+      - script.execute: blink_mute_led
+   #   - logger.log_level: DEBUG
+        
+    on_turn_off:
+      - script.stop: blink_mute_led
+      - output.turn_off: amp_mute_led
+    #  - logger.log_level: NONE
+ 
+        
+
+script:
+  - id: blink_mute_led
+    then:
+      - while:
+          condition:
+            switch.is_on: mute
+          then:
+            - output.turn_on: amp_mute_led
+            - delay: 500ms
+            - output.turn_off: amp_mute_led
+            - delay: 500ms

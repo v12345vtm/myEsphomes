@@ -1,0 +1,81 @@
+esphome:
+  name: "esp512kbgaragepir"
+  friendly_name: Esp512kb
+
+esp8266:
+  board: esp01_1m
+ # framework version to 3.0.2 
+ # framework: 
+ #   version: "3.0.2"  #updates werken niet goed met de https url requests
+
+substitutions:
+  device_name: Pirgarage
+  pin_pir : GPIO2
+  actionurl30secgarage : "http://192.168.1.2/postEvent.html?action=input&STM=0&MOD=7&CHA=0&EVT=2" 
+   
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "Ur7+8NJcy41pPKfgTGFrCXCD0m3DTQuJhbnPVZhSPbI="
+
+ota:
+  - platform: esphome
+    password: "acce69e21ed508f07a392a3d3c3f4e49"
+
+
+wifi:
+  fast_connect: True  
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+
+
+
+      # Optional manual IP
+ # use_address: 192.168.1.29 #oudipadress
+  #manual_ip:
+#    static_ip: 192.168.1.29
+ ###   gateway: 192.168.1.1
+#    subnet: 255.255.255.0
+
+ 
+  #  on_press:
+  #    then:
+       # - http_request.get: ${actionurl30secgarage} 
+
+   
+  
+
+
+
+switch:
+#Restart esp
+  - platform: restart
+    name: PIRSensorGarage_restart
+
+  
+
+
+
+binary_sensor:
+  - platform: gpio
+    pin: ${pin_pir}
+    name: "PIR Sensor Garage"
+    device_class: motion
+ #   on_press:
+    #  - http_request.get: ${actionurl30secgarage} 
+
+
+ 
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${device_name}_IP"
+    mac_address:
+      name: "${device_name}_mac"      
+    

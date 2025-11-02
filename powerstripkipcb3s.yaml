@@ -1,0 +1,324 @@
+esphome:
+  name: powerstripkipcb3s
+  friendly_name: PowerStripKipCB3S
+
+bk72xx:
+  board: cb3s
+
+
+
+substitutions:
+  relaisA : "Pomp600L"  # ${relaisA} verst van knop
+  relaisB : "KipRen50W"  # ${relaisB}
+  relaisC : "Lantaarn"  # ${relaisC}
+  relaisD : "usbcameras"  # ${relaisD}
+  integratedbutton : "Buttonknop"  # ${integratedbutton}
+  integratedled : "ButtonLed"  # ${integratedled} (knippert als hij offline is)
+
+  gpiorelaisA : "GPIO8"  # ${gpiorelaisA} 
+  gpiorelaisB : "GPIO7"  # ${gpiorelaisB}
+  gpiorelaisC : "GPIO6"  # ${gpiorelaisC}
+  gpiorelaisD : "GPIO14"  # ${gpiorelaisD}
+
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  #encryption:
+   # key: "TRnthQi7XsYeH+RzK8iXc9rcECFeFRpuZsoOgZwbg2I="
+
+ota:
+  - platform: esphome
+    password: "01714a54a2f91656223f3afe4727a066"
+
+    
+
+########
+
+# Turn off the light when WiFi connects
+wifi:
+  on_connect:
+    then:
+      - light.turn_on: integratedled
+      - delay: 2500ms
+      - light.turn_off: integratedled
+       
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Powerstripkipcb3S"
+    password: "kipkipkip"
+
+web_server:
+  js_include: "esphomecss/www.js"
+  js_url: ""
+  version: 2
+
+captive_portal:
+
+# https://docs.libretiny.eu/boards/cb3s/cb3s.svg
+
+
+
+
+switch:
+  - platform: gpio
+    pin: ${gpiorelaisA} 
+    id : relaisA #dit is onze fysyke relais
+    name: ${relaisA}
+    inverted: False
+    icon: "mdi:water-pump"
+
+  - platform: gpio
+    pin: ${gpiorelaisB} 
+    id : relaisB #dit is onze fysyke relais
+    name: ${relaisB}
+    inverted: False
+    icon: "mdi:light-flood-down"
+
+  - platform: gpio
+    pin: ${gpiorelaisC}
+    id : relaisC #dit is onze fysyke relais
+    name: ${relaisC}
+    inverted: False
+    icon: "mdi:post-lamp"
+
+  - platform: gpio
+    pin: ${gpiorelaisD}
+    id : relaisD #dit is onze fysyke relais
+    name: ${relaisD}
+    inverted: False
+    restore_mode: ALWAYS_ON
+    internal: True
+    icon: "mdi:usb-port"
+
+  - platform: template
+    name: "Timed ${relaisA}"
+    icon: "mdi:timer"
+    turn_on_action:
+      - switch.turn_on: relaisA
+      - delay:   !lambda 'return id(timer_duration_relaisA).state * 1000;'
+      - switch.turn_off: relaisA
+    turn_off_action:
+      - switch.turn_off: relaisA
+    lambda: |-
+      return id(relaisA).state;       
+
+  - platform: gpio
+    pin: GPIO24
+    id: relayzoom #dit is onze fysyke led bijgesoldert
+    name: "geelledintern"
+    inverted: False
+    internal: True
+
+
+ 
+
+
+button:
+  - platform: restart
+    name: "Device Restart"
+    entity_category: diagnostic
+    icon: mdi:restart
+
+#button:
+  - platform: template
+    name: "2 Minute Timer for ${relaisA}"
+    id: two_minute_timer_relaisA
+    icon: "mdi:water-pump"
+    on_press:
+      then:
+        - switch.turn_on: relaisA
+        - delay:   !lambda 'return id(timer_duration_relaisA).state * 1000;'
+        - switch.turn_off: relaisA
+
+  - platform: template
+    name: "reset ${relaisD}"
+    id: resetrelaisD
+    icon: "mdi:lock-reset"
+    on_press:
+      then:
+        - switch.turn_off: relaisD
+        - delay:  5s
+        - switch.turn_on: relaisD
+
+
+
+number:
+  - platform: template
+    name: "Timer Duration for ${relaisA}"
+    id: timer_duration_relaisA
+    min_value: 10
+    max_value: 300  # Maximum 5minuten (300 seconds)
+    step: 5
+    mode: BOX
+    unit_of_measurement: "seconds"
+    icon: "mdi:timer"
+    optimistic: true
+    restore_value: true
+    initial_value: 120  # Initial value of 2 minutes (120 seconds)
+
+
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO10
+      inverted: true
+      mode: INPUT_PULLUP
+    name: ${integratedbutton}
+    id : integratedbutton # This is our physical button built into the power strip
+    on_click:
+      min_length: 10ms
+      max_length: 500ms
+      then:
+        - button.press: two_minute_timer_relaisA
+ 
+
+
+
+#binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO26
+      inverted: True
+      mode: INPUT_PULLUP
+    name: knop26
+    id : knop26 #dit is onze fysike knop gesoldeert    intern niet nr buitengebracht
+    internal: True
+
+
+
+ 
+
+
+output:
+  - platform: gpio
+    pin: GPIO23 #heeft de groene led in de button
+    id: led_output
+    inverted: True  
+
+
+  
+
+
+light:
+  - platform: binary
+    name: ${integratedled}
+    output: led_output
+    id : integratedled
+
+
+# Create an interval to check WiFi status and control the light
+interval:
+  - interval: 300ms
+    then:
+      if:
+        condition:
+          not:
+            wifi.connected:
+        then:
+          - light.toggle: integratedled
+
+
+  - interval: 60s
+    then:
+      - logger.log:
+          format: "Current time: %02d:%02d:%02d"
+          args: [id(sntp_time).now().hour, id(sntp_time).now().minute, id(sntp_time).now().second]
+          level: INFO
+
+# Time component using NTP
+time:
+  - platform: sntp
+    id: sntp_time
+    servers:
+      - pool.ntp.org
+      - 0.pool.ntp.org
+      - 1.pool.ntp.org
+    timezone: "Europe/Brussels"
+# Log when time is synchronized 
+    on_time_sync:
+      then:
+        - logger.log: "Time synchronized with NTP server"
+    on_time:
+      - seconds: 50
+        minutes: 59
+        hours: 21
+        then:
+          - switch.turn_off: relaisA
+          - logger.log: "auto Time off ${relaisA}"
+      - seconds: 00
+        minutes: 00
+        hours: 22
+        then:
+          - switch.turn_off: relaisB
+          - logger.log: "auto Time off ${relaisB}"
+      - seconds: 10
+        minutes: 00
+        hours: 22
+        then:
+          - switch.turn_off: relaisC
+          - logger.log: "auto Time off ${relaisC}"
+          
+          
+
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal Strength dBm"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+    internal: True
+
+  - platform: copy
+    source_id: wifi_signal_db
+    name: "WiFi Signal Strength Percentage"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+    device_class: ""
+
+
+#sensor:
+  - platform: internal_temperature
+    name: "Internal Temperature"  
+
+
+
+datetime:
+  - platform: template
+    id: time_open_test
+    type: time
+    name: "Time Open - TEST"
+    icon: mdi:sort-clock-descending
+    optimistic: yes
+    initial_value: "08:30:00"
+    restore_value: true
+    on_time:
+      then:
+        - logger.log: "auto Time off ${relaisC}"
+
+  - platform: template
+    id: time_close_test
+    type: time
+    name: "Time Close - TEST"
+    icon: mdi:sort-clock-ascending
+    optimistic: yes
+    initial_value: "21:30:00"
+    restore_value: true
+    on_time:
+      then:
+        - logger.log: "auto Time off ${relaisC}"
+
+
+
+
+
+ 

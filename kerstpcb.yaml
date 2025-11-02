@@ -1,0 +1,185 @@
+esphome:
+  name: kerstpcb  #oma living lamp nu 
+  friendly_name: kerstpcb
+  on_boot:
+    then:
+      - light.control: 
+          id: the_light
+          #brightness: 70%
+          cold_white: 20%
+          warm_white: 50%  
+
+bk72xx:
+  board: generic-bk7231n-qfn32-tuya
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+#api:
+#  encryption:
+#   key: "gADxP8t8CtAKECBiEeJiJ7SR4jCv6SXOqwNux38Spz0="
+
+ota:
+  - platform: esphome
+    password: "993d35f7f00cbd99c3904a577ee8cb04"
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: Proximus-Home-764621
+    password: dxrcku994uz3pamr   
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Kerstpcb Fallback Hotspot"
+    password: "kipkipkip"
+
+captive_portal:
+
+web_server:
+  js_include: "esphomecss/www.js"
+  js_url: ""
+  version: 2
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal Strength dBm"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+    internal: True
+
+  - platform: copy
+    source_id: wifi_signal_db
+    name: "WiFi Signal Strength Percentage"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+    device_class: ""
+
+
+    
+
+
+ #sensor:
+  - platform: internal_temperature
+    name: "Internal Temperature"    
+
+
+
+# Define outputs   p6 os groene inbouwled    pwm1 markering is P9    pwm2 markering is P8
+
+
+
+
+output:
+  - platform: libretiny_pwm
+    id: output_cold_white
+    pin: P9
+  - platform: libretiny_pwm
+    id: output_warm_white
+    pin: P8
+
+
+ 
+
+# Example usage in a light
+light:
+  - platform: monochromatic
+    output: output_cold_white
+    name: "output_cold_white"  
+    id : koud 
+    #restore_mode: ALWAYS_ON 
+    internal: True
+
+  - platform: monochromatic
+    output: output_warm_white
+    name: "output_warm_white"    
+    id : warm
+    #restore_mode: ALWAYS_ON
+    internal: True
+
+
+
+
+# Example configuration entry
+#light:
+  - platform: cwww
+    name: "lscwit"
+    id: the_light
+    restore_mode: ALWAYS_ON
+    cold_white: output_cold_white
+    warm_white: output_warm_white
+    cold_white_color_temperature: 6536 K
+    warm_white_color_temperature: 2000 K
+    constant_brightness: true
+    effects:
+      - random:
+          name: "Slow Random"
+          transition_length: 30s
+          update_interval: 30s
+      - random:
+          name: "Fast Random"
+          transition_length: 2s
+          update_interval: 5s
+      - strobe:
+      - flicker:
+          alpha: 50% #The percentage that the last color value should affect the light. More or less the “forget-factor” of an exponential moving average. Defaults to 95%.
+          intensity: 50% #The intensity of the flickering, basically the maximum amplitude of the random offsets. Defaults to 1.5%.
+      - lambda:
+          name: Throb
+          update_interval: 1s
+          lambda: |-
+            static int state = 0;
+            auto call = id(the_light).turn_on();
+            // Transtion of 1000ms = 1s
+            call.set_transition_length(1000);
+            if (state == 0) {
+              call.set_brightness(1.0);
+            } else {
+              call.set_brightness(0.01);
+            }
+            call.perform();
+            state += 1;
+            if (state == 2)
+              state = 0;
+
+ 
+
+# Add a button for rebooting the device
+button:
+  - platform: restart
+    name: "Reboot LSC Filament Smart"
+
+  - platform: template
+    id: gezellig
+    name: gezellig
+    on_press: 
+      then :
+      - light.control: 
+          id: the_light
+          #brightness: 70%
+          cold_white: 20%
+          warm_white: 50%
+
+  - platform: template
+    id: solderen
+    name: solderen
+    on_press: 
+      then : 
+      - light.control: 
+          id: the_light
+          #brightness: 70%
+          cold_white: 100%
+          warm_white: 0%          
+
+
+text_sensor:
+  - platform: wifi_info    
+    ip_address:
+      name: "lamp IP Address"
+
+ 

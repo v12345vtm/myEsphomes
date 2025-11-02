@@ -1,0 +1,60 @@
+substitutions:
+  name: esp32-bluetooth-proxy-809470
+  friendly_name: Bluetooth Proxy 485
+packages:
+  esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/esp32-generic/esp32-generic.yaml@main
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+api:
+  encryption:
+    key: DT9gBfwF1nxIWiU++XctF/VV0t2uQvZiUkoqyGKFw58=
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: True
+
+
+binary_sensor:
+  
+  # Presence based on BLE Service UUID
+  - platform: ble_presence
+    service_uuid: "6e400001-b5a3-f393-e0a9-e50e24dcca9e" #klever
+    name: "Klever_B_C40111890351F"
+    timeout: 6s  
+
+  - platform: ble_presence
+    mac_address: "FF:FF:50:00:BE:A9"
+    name: "Itag Lichtblauw"
+    timeout: 60s  
+
+  - platform: ble_presence
+    mac_address: FF:FF:40:02:E1:10
+    name: "Itag zwart"
+    min_rssi: -80dB
+    timeout : 60s
+
+
+  - platform: ble_presence
+    mac_address: 28:37:2F:55:67:2E
+    name: "veloBT_C3"
+    timeout : 6s
+
+ 
+
+#{"name":"Klever_B_C40111890351F","address":"F9:59:8F:15:77:E2","rssi":-65,"manufacturer_data":{},"service_data":{},
+#"service_uuids":["6e400001-b5a3-f393-e0a9-e50e24dcca9e"],"
+#source":"10:06:1C:80:94:70","connectable":true,"time":1742839516.1592987,"tx_power":null}
+
+
+#{"name":"iTAG appelblzeegroen           ","address":"FF:FF:50:00:BE:A9","rssi":-87,"manufacturer_data":
+#  {},"service_data":{},"service_uuids":["0000ffe0-0000-1000-8000-00805f9b34fb"],
+#"source":"10:06:1C:80:94:70","connectable":true,"time":1742844780.4961376,"tx_power":0}
+
+
+#{"name":"iTAG  zwart          ","address":"FF:FF:40:02:E1:10","rssi":-88,"manufacturer_data":{},"service_data":{},
+#"service_uuids"                :["0000ffe0-0000-1000-8000-00805f9b34fb"],"
+#source":"10:06:1C:80:94:70","connectable":true,"time":1742845645.3033247,"tx_power":0}

@@ -1,0 +1,159 @@
+esphome:
+  name: nodemcu09
+  friendly_name: Nodemcu09
+
+esp8266:
+  board: esp01_1m
+
+
+substitutions:
+  device_name: vnodemcu09
+  pin_ingebouwdewifiblauweled : GPIO2 
+  pin_ingebouwdestatusled : GPIO16
+  pin_pir : GPIO5
+  actionurl30secdressing : "http://192.168.1.2:80/postEvent.html?action=input&STM=0&MOD=6&CHA=11&EVT=2" 
+ 
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "FtdUoZUnWQXSYZKT5+msZ9zDlR4vJ6kT36ePGj4h69o="
+
+ota:
+  password: "422ce8a1bcbcb9e994ffeb8a7f2d6834"
+
+wifi:
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  - ssid: !secret wifi_ssid2
+    password: !secret wifi_password 
+  - ssid: !secret wifi_ssid3
+    password: !secret wifi_password   
+
+ 
+ 
+
+web_server:
+  port : 80
+
+#mqtt:
+#  broker: !secret mqtt_broker 
+#  username: !secret mqtt_user 
+#  password: !secret mqtt_password  
+
+http_request:
+  useragent: esphome/device
+  timeout: 10s  
+
+button:
+  - platform: template
+    name: "dressing 30sec licht"
+    id : button1
+    on_press:
+      - logger.log: Button Pressed  met dressing      
+      - http_request.get: ${actionurl30secdressing} 
+      #- http_request.get:"http://192.168.1.2:80/postEvent.html?action=input&STM=0&MOD=4&CHA=15&EVT=3"
+ 
+ 
+
+
+#  builtin Led
+output:
+  #- platform: gpio
+  #  pin: ${pin_ingebouwdeblauweled} #GPIO2
+  #  id: onboardled_blauw_wifirx
+  #  inverted: yes
+    
+
+  - platform: gpio
+    pin: ${pin_ingebouwdestatusled} #GPIO16
+    id: ingebouwdestatusled
+    inverted: yes
+ 
+
+
+## blauwe builtin Led op gpio_2 en 16
+light:
+ 
+  - platform: binary
+    output: ingebouwdestatusled
+    name: ${device_name}_statusled
+
+
+binary_sensor:
+  - platform: gpio
+    pin: ${pin_pir}
+    name: "PIR Sensor Dressing"
+    device_class: motion
+    on_press:
+      - http_request.get: ${actionurl30secdressing} 
+ 
+
+
+
+
+# Example configuration entry
+dallas:
+  - pin: 4
+    update_interval: 5s
+
+
+sensor:
+
+
+# Individual sensors
+#sensor:
+ 
+  - platform: dallas
+    address: 0x3961f0d708646128 #zie log tijdens het opstarten wat je adres is en de calib filters ff uitzettenn
+    name: "Boiler warmwater Temperature"  
+    filters :
+    - calibrate_linear:
+      - 0.0 -> 0.0
+      - 24.6 ->24.6 
+ 
+
+
+# Example configuration entry with 2 sensors and filter
+#sensor:
+  - platform: wifi_signal # Reports the WiFi signal strength/RSSI in dB
+    name: "${device_name}_WiFi Signal dB"
+    id: wifi_signal_db
+    update_interval: 80s
+    entity_category: "diagnostic"
+    disabled_by_default: true
+    internal: true
+  - platform: copy # Reports the WiFi signal strength in %
+    source_id: wifi_signal_db
+    name: "${device_name}_WiFi_Pct"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "Signal %"
+    entity_category: "diagnostic"
+  - platform: uptime
+    name: "${device_name}_Uptime"    
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${device_name}_IP"
+    ssid:
+      name: "${device_name}_ssid"
+    bssid:
+      name: "${device_name}_bssid"
+    mac_address:
+      name: "${device_name}_mac"
+    scan_results:
+      name: "${device_name}_scanresults"
+    dns_address:
+      name: "${device_name}_dns"        
+
+switch:      
+  - platform: restart
+    name: ${device_name}_restart.  
+
+    

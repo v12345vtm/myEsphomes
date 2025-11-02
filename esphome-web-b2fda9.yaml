@@ -1,0 +1,525 @@
+substitutions:
+  name: esphome-web-b2fda9
+  friendly_name: LGremoteTV
+  device_name: LGremoteTV   
+  
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: false
+  project:
+    name: esphome.web
+    version: '1.0'
+
+esp8266:
+  board: esp01_1m
+
+
+
+ 
+   
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+# Allow Over-The-Air updates
+ota:
+  - platform: esphome
+
+# Allow provisioning Wi-Fi via serial
+improv_serial:
+
+web_server:
+  js_include: "esphomecss/www.js"
+  js_url: ""
+  version: 2
+ 
+wifi:
+  fast_connect: True  
+  power_save_mode: none
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+  
+
+# In combination with the `ap` this allows the user
+# to provision wifi credentials to the device via WiFi AP.
+captive_portal:
+
+dashboard_import:
+  package_import_url: github://esphome/example-configs/esphome-web/esp8266.yaml@main
+  import_full_config: true
+
+
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${device_name}_IP"
+ 
+ 
+    mac_address:
+      name: "${device_name}_mac"
+ 
+
+  
+    ssid:
+      name: "${device_name}_ssid"
+
+
+
+switch:
+#Restart esp
+  - platform: restart
+    name: "${device_name}_restart"
+
+
+remote_transmitter:   
+  pin:
+    number: GPIO4
+    inverted: False  # 
+  carrier_duty_percent: 50%
+     
+#https://gist.github.com/TheGroundZero/74035123938ecb13c8864ff1e65dc4d3
+#	Button	Data	nbits
+#	Power	0x20DF10EF	32
+#	TvRad	0x20DF0FF0	32
+#	Input	0x20DFD02F	32
+#	QMenu	0x20DFC23D	32
+#	Ratio	0x20DF9E61	32
+#	Subttl	0x20DF9C63	32
+#	1	0x20DF8877	32
+#	2	0x20DF48B7	32
+#	3	0x20DFC837	32
+#	4	0x20DF28D7	32
+#	5	0x20DFA857	32
+#	6	0x20DF6897	32
+#	7	0x20DFE817	32
+#	8	0x20DF18E7	32
+#	9	0x20DF9867	32
+#	Guide	0x20DFD52A	32
+#	0	0x20DF08F7	32
+#	QView	0x20DF58A7	32
+#	VolUp	0x20DF40BF	32
+#	VolDwn	0x20DFC03F	32
+#	Fav	0x20DF7887	32
+#	Info	0x20DF55AA	32
+#	Mute	0x20DF906F	32
+#	ChUp	0x20DF00FF	32
+#	ChDwn	0x20DF807F	32
+#	App*	0x20DFF906	32
+#	Home	0x20DF3EC1	32
+#	MyApps	0x20DF42BD	32
+#	Text	0x20DF04FB	32
+#	TOpt	0x20DF847B	32
+#	Up	0x20DF02FD	32
+#	Down	0x20DF827D	32
+#	Left	0x20DFE01F	32
+#	Right	0x20DF609F	32
+#	OK	0x20DF22DD	32
+#	Back	0x20DF14EB	32
+#	Exit	0x20DFDA25	32
+#	AD	0x20DF8976	32
+#	List	0x20DFCA35	32
+#	Stop	0x20DF8D72	32
+#	Rew	0x20DFF10E	32
+#	Play	0x20DF0DF2	32
+#	Pause	0x20DF5DA2	32
+#	Fwd	0x20DF718E	32
+#	Red	0x20DF4EB1	32
+#	Green	0x20DF8E71	32
+#	Yellow	0x20DFC639	32
+#	Blue	0x20DF8679	32
+
+
+ 
+button:
+  - platform: template
+    name: Power
+    id: button_power
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF10EF
+          nbits: 32
+
+  - platform: template
+    name: TvRad
+    id: button_tvrad
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF0FF0
+          nbits: 32
+
+  - platform: template
+    name: Input
+    id: button_input
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFD02F
+          nbits: 32
+
+  - platform: template
+    name: QMenu
+    id: button_qmenu
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFC23D
+          nbits: 32
+
+  - platform: template
+    name: Ratio
+    id: button_ratio
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF9E61
+          nbits: 32
+
+  - platform: template
+    name: Subttl
+    id: button_subttl
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF9C63
+          nbits: 32
+
+  - platform: template
+    name: "1"
+    id: button_1
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF8877
+          nbits: 32
+
+  - platform: template
+    name: "2"
+    id: button_2
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF48B7
+          nbits: 32
+
+  - platform: template
+    name: "3"
+    id: button_3
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFC837
+          nbits: 32
+
+  - platform: template
+    name: "4"
+    id: button_4
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF28D7
+          nbits: 32
+
+  - platform: template
+    name: "5"
+    id: button_5
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFA857
+          nbits: 32
+
+  - platform: template
+    name: "6"
+    id: button_6
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF6897
+          nbits: 32
+
+  - platform: template
+    name: "7"
+    id: button_7
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFE817
+          nbits: 32
+
+  - platform: template
+    name: "8"
+    id: button_8
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF18E7
+          nbits: 32
+
+  - platform: template
+    name: "9"
+    id: button_9
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF9867
+          nbits: 32
+
+  - platform: template
+    name: Guide
+    id: button_guide
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFD52A
+          nbits: 32
+
+  - platform: template
+    name: "0"
+    id: button_0
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF08F7
+          nbits: 32
+
+  - platform: template
+    name: QView
+    id: button_qview
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF58A7
+          nbits: 32
+
+  - platform: template
+    name: VolUp
+    id: button_volup
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF40BF
+          nbits: 32
+
+  - platform: template
+    name: VolDwn
+    id: button_voldwn
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFC03F
+          nbits: 32
+
+  - platform: template
+    name: Fav
+    id: button_fav
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF7887
+          nbits: 32
+
+  - platform: template
+    name: Info
+    id: button_info
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF55AA
+          nbits: 32
+
+  - platform: template
+    name: Mute
+    id: button_mute
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF906F
+          nbits: 32
+
+  - platform: template
+    name: ChUp
+    id: button_chup
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF00FF
+          nbits: 32
+
+  - platform: template
+    name: ChDwn
+    id: button_chdown
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF807F
+          nbits: 32
+
+  - platform: template
+    name: App
+    id: button_app
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFF906
+          nbits: 32
+
+  - platform: template
+    name: Home
+    id: button_home
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF3EC1
+          nbits: 32
+
+  - platform: template
+    name: MyApps
+    id: button_myapps
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF42BD
+          nbits: 32
+
+  - platform: template
+    name: Text
+    id: button_text
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF04FB
+          nbits: 32
+
+  - platform: template
+    name: TOpt
+    id: button_topt
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF847B
+          nbits: 32
+
+  - platform: template
+    name: Up
+    id: button_up
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF02FD
+          nbits: 32
+
+  - platform: template
+    name: Down
+    id: button_down
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF827D
+          nbits: 32
+
+  - platform: template
+    name: Left
+    id: button_left
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFE01F
+          nbits: 32
+
+  - platform: template
+    name: Right
+    id: button_right
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF609F
+          nbits: 32
+
+  - platform: template
+    name: OK
+    id: button_ok
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF22DD
+          nbits: 32
+
+  - platform: template
+    name: Back
+    id: button_back
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF14EB
+          nbits: 32
+
+  - platform: template
+    name: Exit
+    id: button_exit
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFDA25
+          nbits: 32
+
+  - platform: template
+    name: AD
+    id: button_ad
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF8976
+          nbits: 32
+
+  - platform: template
+    name: List
+    id: button_list
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFCA35
+          nbits: 32
+
+  - platform: template
+    name: Stop
+    id: button_stop
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF8D72
+          nbits: 32
+
+  - platform: template
+    name: Rew
+    id: button_rew
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFF10E
+          nbits: 32
+
+  - platform: template
+    name: Play
+    id: button_play
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF0DF2
+          nbits: 32
+
+  - platform: template
+    name: Pause
+    id: button_pause
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF5DA2
+          nbits: 32
+
+  - platform: template
+    name: Fwd
+    id: button_fwd
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF718E
+          nbits: 32
+
+  - platform: template
+    name: Red
+    id: button_red
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF4EB1
+          nbits: 32
+
+  - platform: template
+    name: Green
+    id: button_green
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF8E71
+          nbits: 32
+
+  - platform: template
+    name: Yellow
+    id: button_yellow
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DFC639
+          nbits: 32
+
+  - platform: template
+    name: Blue
+    id: button_blue
+    on_press:
+      - remote_transmitter.transmit_lg:
+          data: 0x20DF8679
+          nbits: 32
+    
+
+ 

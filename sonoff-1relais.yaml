@@ -1,0 +1,210 @@
+esphome:
+  name: sonoff-1relais
+  friendly_name: sonoff_1relais
+
+esp8266:
+  board: esp8285
+
+
+#The sonoff basic only directly exposes four functional GPIO pins:
+#
+#    GPIO 0: Push button (Input)
+#    GPIO 2: IO2 Pad (freely useable)
+#    GPIO 12: Relais (LOW is off, HIGH is on)
+#    GPIO 13: The green LED (LOW is on, HIGH is off
+
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "tzezPUUXzNPlqqmzHnW96lsB60c5DIfoa8chzATAjjE="
+
+ota:
+  - platform: esphome
+    password: "6c0300fced06fb1b287b1c931cdb28b1"
+
+# Turn off the light when WiFi connects
+# Turn off the light when WiFi connects
+wifi:
+  on_connect:
+    then:
+      - light.turn_on: integratedled
+      - delay: 2500ms
+      - light.turn_off: integratedled
+       
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Sonoff-1Relais"
+    password: "kipkipkip"
+
+captive_portal:
+
+web_server:
+  port: 80  
+    
+
+
+
+# GPIO 0: Push button (Input)
+ 
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO0
+      inverted: true
+      mode: INPUT_PULLUP
+    name: "Push Button"
+    id : integratedbutton # This is our physical button built into the power strip
+    on_click:
+      min_length: 10ms
+      max_length: 500ms
+      then:
+        - switch.toggle: relaisA
+ 
+
+
+button:
+  - platform: restart
+    name: "Device Restart"
+    entity_category: diagnostic
+    icon: mdi:restart
+
+#button:
+  - platform: template
+    name: "togglerelais"
+    id: omschakelen_relaisA
+    icon: "mdi:toggle-switch"
+    on_press:
+      then:
+        - switch.toggle: relaisA
+
+
+# GPIO 2: IO2 Pad (freely useable)
+# You can add components here as needed
+
+# GPIO 12: Relais (LOW is off, HIGH is on)
+switch:
+  - platform: gpio
+    pin: GPIO12
+    name: "Relay"
+    id : relaisA
+
+# GPIO 13: The green LED (LOW is on, HIGH is off)
+light:
+  - platform: binary
+    name: "Green LED"
+    output: green_led_output
+    id : integratedled
+
+
+
+
+#light:
+  - platform: binary
+    name: "Test B"
+    output: test_b_output
+  - platform: binary
+    name: "Test C"
+    output: test_c_output
+  - platform: binary
+    name: "Test D"
+    output: test_d_output
+  - platform: binary
+    name: "Test E"
+    output: test_e_output
+
+
+
+output:
+  - platform: gpio
+    pin: GPIO13
+    inverted: true
+    id: green_led_output    
+
+
+
+#output:
+ 
+  - platform: gpio
+    pin: GPIO2
+    id: test_a_output
+  - platform: gpio
+    pin: GPIO1
+    id: test_b_output
+  - platform: gpio
+    pin: GPIO3
+    id: test_c_output
+  - platform: gpio
+    pin: GPIO4
+    id: test_d_output
+  - platform: gpio
+    pin: GPIO5
+    id: test_e_output
+
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal Strength dBm"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: "diagnostic"
+    internal: True
+
+  - platform: copy
+    source_id: wifi_signal_db
+    name: "WiFi Signal Strength Percentage"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    entity_category: "diagnostic"
+    device_class: ""
+
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP" 
+    mac_address:
+      name: "mac"
+
+
+
+# Time component using NTP
+time:
+  - platform: sntp
+    id: sntp_time
+    servers:
+      - pool.ntp.org
+      - 0.pool.ntp.org
+      - 1.pool.ntp.org
+    timezone: "Europe/Brussels"
+
+
+# Log when time is synchronized
+ 
+    on_time_sync:
+      then:
+        - logger.log: "Time synchronized with NTP server"
+
+
+
+
+# Create an interval to check WiFi status and control the light
+interval:
+  - interval: 300ms
+    then:
+      if:
+        condition:
+          not:
+            wifi.connected:
+        then:
+          - light.toggle: integratedled
+

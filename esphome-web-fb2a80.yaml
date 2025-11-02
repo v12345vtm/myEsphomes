@@ -1,0 +1,197 @@
+esphome:
+  name: esphome-web-fb2a80
+  friendly_name: Wind
+  min_version: 2024.11.0
+  name_add_mac_suffix: false
+  on_boot: 
+    then:
+      #- delay: 2s # ook een 10k weerstand op gpio0 solderen of anders boot hij niet omdat het reset circuit te rap opgeladen s met de rctijd
+          
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+    
+
+# Enable logging
+logger:
+
+api:
+ 
+
+one_wire:
+  - platform: gpio
+    pin: 3
+
+
+sensor:
+  - platform: dallas_temp
+    name: "Buitentemp"
+    id: ds1820
+    update_interval: 3s
+ 
+# Example configuration entry
+#sensor:
+  - platform: veml7700
+    address: 0x10
+    update_interval: 59s 
+    id : windluxmeter
+    # short variant of sensor definition:
+    ambient_light: "Ambient light"
+    # longer variant of sensor definition:
+    actual_gain:
+      name: "Actual gain" 
+    full_spectrum:
+      name : "full_spectrum"
+    infrared : 
+      name: "infrared"    
+#sensor:
+    #Calculate the circumference of the disk:
+    #C=π×d=π×0.12 m=0.3770 mC=π×d=π×0.12 m=0.3770 m
+    #One rotation (1 pulse) represents 0.3770 meters of wind travel.
+    #To convert from pulses per minute to meters per second:
+    #0.3770 m pulse / 60 s min=0.00628 m s per pulse min60 s min0.3770 m pulse​=0.00628 m s per pulse min
+
+ 
+ 
+  - platform: pulse_meter
+    pin:
+      number: GPIO4
+      #inverted: True   
+      allow_other_uses: True
+    name: "Wind Speed"
+    id : windspeed
+    unit_of_measurement: "m/s"
+    filters:
+      - filter_out: nan
+      - throttle_average: 10s  #1s  
+      - multiply: 0.377  #12cm diameter 1toer is omtrek 37.7cm  Adjust this value based on your sensor's specifications
+      - multiply: 0.3333 #3pulsen per toer
+      - multiply: 0.16666 #als de wind waait is de mechanische weerstand er , en dat kan zijn dat de wind 2tot 6 keer kracht verliest in de cups
+      - sliding_window_moving_average: # Helps prevent too many datapoints
+          window_size: 100  # 10
+          send_every:  10  # 5
+    internal_filter: 13us
+    timeout: 5s
+    total:
+      name: "Total Pulses"
+      id : totalpulses
+      filters:
+        - lambda: return x;    
+ 
+#   - platform: copy
+#    source_id: windspeed
+#    name: "wind kmuur"    
+#    unit_of_measurement: "km/h"
+#    filters:
+#      - multiply: 3.6
+
+ 
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO4
+      inverted: False   
+      allow_other_uses: True
+    name: windflipsteller
+    id :   windflipsteller
+    internal: True
+ 
+
+
+
+
+ 
+
+# Allow Over-The-Air updates
+ota:
+- platform: esphome
+
+wifi:
+  on_connect:
+    then:
+      - light.turn_on: integratedled
+      - delay: 2500ms
+      - light.turn_off: integratedled  
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: True
+  output_power: 8.5db
+ 
+ 
+i2c:
+  sda: GPIO8
+  scl: GPIO9
+  scan: true
+  id: bus_a
+
+ 
+
+web_server:
+  js_include: "esphomecss/www.js"
+  js_url: ""
+  version: 2
+
+output:
+  - platform: gpio
+    pin: 2 #heeft de rode led
+    id: led_output
+    inverted: False  
+    
+
+
+# Create an interval to check WiFi status and control the light
+interval:
+  - interval: 300ms
+    then:
+      if:
+        condition:
+          not:
+            wifi.connected:
+        then:
+          - light.toggle: integratedled
+
+ 
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(windspeed).state != 0;'
+          then:
+            - lambda: |-
+                id(totalpulses) = 0;
+
+light:
+  - platform: binary
+    name: integratedled
+    output: led_output
+    id : integratedled
+
+
+
+ 
+
+text_sensor:
+  - platform: wifi_info    
+    ip_address:
+      name: "ip"
+      id: ip
+    mac_address:
+      name: "mac"
+
+  - platform: template
+    name: "fixed IP"
+    lambda: 'return id(ip).state + " ";'
+
+
+
+
+
+button:
+  - platform: restart
+    name: "windmolenrestart"    
+
+
+

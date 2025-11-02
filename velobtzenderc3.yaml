@@ -1,0 +1,55 @@
+esphome:
+  name: velobtzenderc3
+  friendly_name: veloBTzenderC3
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+# Example configuration entry
+logger:
+  level: DEBUG
+ 
+#ota:
+#  - platform: esphome
+#    password: "e3bfa117598d688594fb6e93b450f3fc"
+
+
+  
+
+#wifi:
+#  ssid: !secret wifi_ssid
+#  password: "pipipipi"
+#  fast_connect: True
+#  output_power: 8.5db
+#  manual_ip:
+#    static_ip: 192.168.1.188
+#    gateway: 192.168.1.1
+#    subnet: 255.255.255.0 
+ 
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+#  ap:
+#    ssid: "Velobtzenderc3"
+#    password: "kipkipkip"
+
+#captive_portal:
+
+  
+
+#web_server:
+#  js_include: "esphomecss/www.js"
+#  js_url: ""
+#  version: 2    
+
+# Example configuration
+
+ 
+
+esp32_ble_beacon:
+  type: iBeacon
+  uuid: 'c29ce823-e67a-4e71-bff2-abaa32e77a98'  # Change to your unique UUID  8aed2228-9309-a631-e6bf-69b266e8a30f
+  major: 1
+  minor: 1
+  tx_power: 3        

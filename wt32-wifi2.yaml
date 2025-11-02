@@ -1,0 +1,393 @@
+
+# https://www.youtube.com/watch?v=A_A0w2CX5xU&t=332s
+
+#Clamp           |  Mean Voltage (V)
+#----------------+------------------
+#CT Clamp 1  en 3    |          
+#CT Clamp 2 Rawen4   |           
+
+esphome:
+  name: wt32-wifi2
+  friendly_name: wt32-wifi2
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+api:
+  #encryption:
+  #  key: !secret apikey
+
+ota:
+  - platform: esphome
+    password: !secret otapassword
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk:
+    pin: GPIO0
+    mode: CLK_EXT_IN
+  phy_addr: 1
+  power_pin: GPIO16
+  id: eth
+
+ 
+ 
+sensor:
+  - platform: adc
+    pin: GPIO39
+    name: "Analog Input Voltage CT1"
+    entity_category: diagnostic 
+    attenuation:  11db #auto
+    accuracy_decimals: 3 
+    update_interval: 1s
+    id : adc_sensor1
+    #internal: True
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10   # number of samples
+          send_every: 10    # how often to report the average    
+
+  - platform: ct_clamp
+    sensor: adc_sensor1
+    name: "CT1_Clamp"
+    update_interval: 2s
+    accuracy_decimals: 3 
+    id: ct1
+    filters:
+      - calibrate_linear:
+          # Measured value of 0 maps to 0A
+          - 0.008 -> 0.02
+          # Known load: 5.0A - change this!
+          # Value shown in logs: 0.01229A - change this!
+          - 0.08 -> 2.1
+          - 0.409 -> 12
+      - clamp:
+          min_value: 0
+          max_value: 100
+
+  - platform: adc
+    pin: GPIO36
+    name: "Analog Input Voltage CT2"
+    entity_category: diagnostic 
+    attenuation:  11db #auto
+    accuracy_decimals: 3 
+    update_interval: 1s
+    id : adc_sensor2
+    #internal: True
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10   # number of samples
+          send_every: 10    # how often to report the average  
+
+
+  - platform: ct_clamp
+    sensor: adc_sensor2
+    name: "CT2_Clamp"
+    accuracy_decimals: 3 
+    update_interval: 2s
+    id: ct2
+    filters:
+      - calibrate_linear:
+          # Measured value of 0 maps to 0A
+          - 0.012 -> 0.00
+          # Known load: 5.0A - change this!
+          # Value shown in logs: 0.01229A - change this!
+          - 0.117 -> 2.05 #(je meet 117mv op de ct clamp bij 2.1amp)
+          - 0.616 -> 12
+      - clamp:
+          min_value: 0
+          max_value: 100
+
+  - platform: adc
+    pin: GPIO15
+    name: "Analog Input Voltage CT3"
+    entity_category: diagnostic 
+    attenuation:  11db #auto
+    accuracy_decimals: 3 
+    update_interval: 1s
+    id : adc_sensor3
+    #internal: True
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10   # number of samples
+          send_every: 10    # how often to report the average  
+
+
+  - platform: ct_clamp
+    sensor: adc_sensor3
+    name: "CT3_Clamp"
+    accuracy_decimals: 3 
+    update_interval: 2s
+    id: ct3
+    filters:
+      - calibrate_linear:
+          # Measured value of 0 maps to 0A
+          - 0.008 -> 0.02
+          # Known load: 5.0A - change this!
+          # Value shown in logs: 0.01229A - change this!
+          - 0.08 -> 2.1 #(je meet 80mv op de ct clamp bij 2.1amp)
+          - 0.411 -> 12
+      - clamp:
+          min_value: 0
+          max_value: 100
+
+
+  - platform: adc
+    pin: GPIO14
+    name: "Analog Input Voltage CT4"
+    entity_category: diagnostic 
+    attenuation:  11db #auto
+    accuracy_decimals: 3 
+    update_interval: 1s
+    id : adc_sensor4
+    #internal: True
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10   # number of samples
+          send_every: 10    # how often to report the average      
+
+  - platform: ct_clamp
+    sensor: adc_sensor4
+    name: "CT4_Clamp"
+    accuracy_decimals: 3 
+    update_interval: 2s
+    id: ct4
+    filters:
+      - calibrate_linear:
+          # Measured value of 0 maps to 0A
+          - 0.008 -> 0.02
+          # Known load: 5.0A - change this!
+          # Value shown in logs: 0.01229A - change this!
+          - 0.117 -> 2.05 #(je meet 117mv op de ct clamp bij 2.1amp)
+          - 0.611 -> 12
+      - clamp:
+          min_value: 0
+          max_value: 100
+
+
+
+################mono 225V
+
+
+  - platform: template
+    id: my_powerct1
+    name: "CT1 Power(mono225V)"
+    lambda: return id(ct1).state * 225.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Total Daily Power CT1"
+    power_id: my_powerct1 
+
+
+
+  - platform: template
+    id: my_powerct2
+    name: "CT2 Power(mono225V)"
+    lambda: return id(ct2).state * 225.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Total Daily Power CT2"
+    power_id: my_powerct2
+
+
+  - platform: template
+    id: my_powerct3
+    name: "CT3 Power(mono225V)"
+    lambda: return id(ct3).state * 225.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Total Daily Power CT3"
+    power_id: my_powerct3
+
+
+
+  - platform: template
+    id: my_powerct4
+    name: "CT4 Power(mono225V)"
+    lambda: return id(ct4).state * 225.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Total Daily Power CT4"
+    power_id: my_powerct4
+
+
+##############  3fase 220V
+
+
+  - platform: template
+    id: my_3fasepowerct1
+    name: "CT1 Power(3fase220)"
+    lambda: return id(ct1).state * 1.732 *  225.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Total Daily 3fase Power CT1"
+    power_id: my_3fasepowerct1 
+
+
+
+  - platform: template
+    id: my_3fasepowerct2
+    name: "CT2 Power(3fase220)"
+    lambda: return id(ct2).state * 1.732 *  225.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Total Daily 3fase Power CT2"
+    power_id: my_3fasepowerct2
+
+
+  - platform: template
+    id: my_3fasepowerct3
+    name: "CT3 Power(3fase220)"
+    lambda: return id(ct3).state * 1.732 *  225.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Total Daily 3fase Power CT3"
+    power_id: my_3fasepowerct3
+
+
+
+  - platform: template
+    id: my_3fasepowerct4
+    name: "CT4 Power(3fase220)"
+    lambda: return id(ct4).state * 1.732 *  225.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Total Daily 3fase Power CT4"
+    power_id: my_3fasepowerct4
+
+
+
+
+
+##############  3fase 400V
+
+
+  - platform: template
+    id: my_3fase400powerct1
+    name: "CT1 Verbruik(3fase400)"
+    lambda: return id(ct1).state * 1.732 *  400.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Totaal Daglijks 3fase400V Verbruik CT1"
+    power_id: my_3fase400powerct1 
+
+
+
+  - platform: template
+    id: my_3fase400powerct2
+    name: "CT2 Verbruik(3fase400)"
+    lambda: return id(ct2).state * 1.732 *  400.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Totaal Daglijks 3fase400V Verbruik CT2"
+    power_id: my_3fase400powerct2
+
+
+  - platform: template
+    id: my_3fase400powerct3
+    name: "CT3 Verbruik(3fase400)"
+    lambda: return id(ct3).state * 1.732 *  400.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Totaal Daglijks 3fase400V Verbruik CT3"
+    power_id: my_3fase400powerct3
+
+
+
+  - platform: template
+    id: my_3fase400powerct4
+    name: "CT4 Verbruik(3fase400)"
+    lambda: return id(ct4).state * 1.732 *  400.0 / 1000; #Power = Current * Voltage (so change 230 to whatever your mains voltage is)
+    unit_of_measurement: 'kW'
+    update_interval: 5s
+  - platform: total_daily_energy
+    name: "Totaal Daglijks 3fase400V Verbruik CT4"
+    power_id: my_3fase400powerct4
+
+
+
+
+
+
+
+
+
+
+web_server:
+  port: 80
+
+button:
+  - platform: restart
+    name: "Reboot Device"
+    entity_category: "diagnostic"
+    icon: "mdi:restart"
+
+time:
+  - platform: sntp
+    id: my_time
+
+text:
+  - platform: template
+    name: "Omschrijving CT1"
+    id: omschr_CT1
+    optimistic: true
+    mode: text
+    restore_value: true
+    initial_value: "Ct1"
+    on_value:
+      - logger.log:
+          format: "CT1 meet nu : %s"
+          args: [x.c_str()]
+
+  - platform: template
+    name: "Omschrijving CT2"
+    id: omschr_CT2
+    optimistic: true
+    mode: text
+    restore_value: true
+    initial_value: "Ct2"
+    on_value:
+      - logger.log:
+          format: "CT2 meet nu : %s"
+          args: [x.c_str()]
+
+  - platform: template
+    name: "Omschrijving CT3"
+    id: omschr_CT3
+    optimistic: true
+    mode: text
+    restore_value: true
+    initial_value: "Ct3"
+    on_value:
+      - logger.log:
+          format: "CT3 meet nu : %s"
+          args: [x.c_str()]
+
+  - platform: template
+    name: "Omschrijving CT4"
+    id: omschr_CT4
+    optimistic: true
+    mode: text
+    restore_value: true
+    initial_value: "Ct4"
+    on_value:
+      - logger.log:
+          format: "CT4 meet nu : %s"
+          args: [x.c_str()]

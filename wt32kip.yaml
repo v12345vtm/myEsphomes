@@ -1,0 +1,711 @@
+# LEDs
+# Er zijn de volgende LEDs:  
+# - Groene LED (onboard TX-LED3 in het schema), op GPIO5 – deze LED kan door de ESP32 worden geschakeld (actief LOW).  
+# - Groene LED (onboard RX-LED4 in het schema), op GPIO17 – deze LED kan door de ESP32 worden geschakeld (actief LOW).  
+# - Rode LED, Power-LED, altijd aan wanneer het module wordt gevoed.  
+
+# Niet bruikbare GPIO’s
+# - IO0: Alleen gebruiken om te programmeren, deelt clocksignaal met de LAN-chip. Er is echter een pull-up aanwezig voor normaal opstarten.  
+# - IO2: Kan worden gebruikt, maar beter open laten om het module te kunnen programmeren. 
+#   IO2: At boot, must float or be pulled low to program. You can use this pin (especially for output) but make sure nothing pulls it high while booting. 
+# - IO6 – IO11: Alleen intern voor het flash-geheugen.  
+# - IO12: Beter niet gebruiken, het module start niet op als deze hoog wordt getrokken.  
+# - IO13, IO18, IO19, IO21, IO22, IO23, IO25, IO26, IO27: in gebruik voor de LAN-chip.  
+# - IO16: in gebruik voor de klokgenerator van de LAN-chip.  
+
+# Bruikbare GPIO’s
+# - IO1: TxD0, standaard UART voor programmeren en debuggen.  
+# - IO3: RxD0, standaard UART voor programmeren en debuggen.  
+# - IO4: vrij te gebruiken.  
+# - IO5: vrij te gebruiken, groene LED is hierop aangesloten, gemarkeerd met RXD (7e pin van linksboven), geeft PWM uit bij het opstarten.  
+# - IO14: vrij te gebruiken, maar geeft PWM uit bij het opstarten.  
+# - IO15: bruikbaar, maar geeft PWM uit bij het opstarten.  
+# - IO17: bruikbaar, groene LED is hierop aangesloten, gemarkeerd met TXD (8e pin van linksboven).  
+# - IO35: alleen bruikbaar als ingang.  
+# - IO32: vrij te gebruiken, gemarkeerd met CFG (5e pin van linksboven).  
+# - IO33: vrij te gebruiken, gemarkeerd met 485_EN (6e pin van linksboven).  
+# - IO36: alleen bruikbaar als ingang.  
+# - IO39: alleen bruikbaar als ingang.  
+
+
+
+# GPIO Pin Usage on WT32KIP (ESP32Dev with MCP23017)
+#
+# Used GPIOs:
+# GPIO0    - Ethernet clk_mode input
+# GPIO5    - DFPlayer RX (UART)
+# GPIO12   - I2S BCLK (audio bit clock)
+# GPIO14   - I2S DOUT (audio data out), also DFPlayer TX pin
+# GPIO15   - I2S LRCLK (audio left-right clock)
+# GPIO17   - DFPlayer TX (UART)
+# GPIO32   - I2C SDA
+# GPIO33   - I2C SCL
+# GPIO35   - GPIO input (reserve, but assigned as input)
+# GPIO36   - Cover limit switch closed (input)
+# GPIO39   - Cover limit switch opened (input)
+
+# MCP23017 expander pins used:
+# A0 (pin 0) - voeding9v (9V power supply switch)
+# A1 (pin 1) - rel2 (unused/reserved)
+# A2 (pin 2) - rolop (cover open relay)
+# A3 (pin 3) - rolneer (cover close relay)
+# B7 (pin 15)- input (GPIO input from MCP23017)
+
+# Reserve GPIOs on WT32KIP:
+# GPIO1 (TX0)   - Serial debug output (avoid for other use)
+# GPIO3 (RX0)   - Serial debug programming (avoid for other use)
+# GPIO2          - Default LED or can be used for output reserve does not program when HIGH (rtttl buzzer werkt niet als je reboot)
+# GPIO4          - Available GPIO rtttl buzzer
+ 
+ 
+# Notes:
+# - UART pins are used for DFPlayer communication (GPIO17 & GPIO5)
+# - I2C pins (GPIO32 and GPIO33) connect to bus_a MCP23017 expander
+# - Ethernet pins are dedicated and cannot be reassigned
+# - Audio I2S pins are dedicated to the external DAC speaker
+# - Pins marked "reserve" can be repurposed carefully if not conflicting
+esphome:
+  name: wt32kip
+  friendly_name: Wt32kip
+  on_boot:
+    then:
+      - delay: 3s #grote condensator laden
+      - dfplayer.set_volume: 30 
+      - dfplayer.stop
+      #- logger.log : "there iss nog geen wifi"  
+      - media_player.volume_set:
+          id: i2s_player
+          volume: 0.35   # 50%
+      -  button.press: buzzeropen
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino #     esp-idf
+
+# Enable logging
+logger:
+  level: ERROR
+
+font:
+  - file: 'slkscr.ttf'
+    id: font1
+    size: 15
+  - file: 'BebasNeue-Regular.ttf'
+    id: font2
+    size: 14
+  - file: 'arial.ttf'
+    id: font3
+    size: 10
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret apikey
+
+ota:
+  - platform: esphome
+    password: !secret otapassword
+
+ # - platform: web_server  # Add this to enable web OTA    
+
+#wifi:
+#  ssid: !secret wifi_ssid
+#  password: !secret wifi_password
+#   ap:
+#    ssid: "Wt32Kip_Hotspot"
+#    password: "kipkipkip"
+
+
+# Example configuration entry for ESP32
+i2c:
+  sda: GPIO32   # CFG
+  scl: GPIO33   # 485_EN
+  scan: False
+  id: bus_a
+
+
+
+
+#wifi:
+#  ssid: !secret wifi_ssid
+#  password: !secret wifi_password
+#  fast_connect: True
+
+
+# https://www.hackerspace-ffm.de/wiki/images/WT32-ETH01_pinout_LL.png
+ 
+
+
+ethernet:
+   type: LAN8720
+   mdc_pin: GPIO23
+   mdio_pin: GPIO18
+   clk:
+     pin: GPIO0
+     mode: CLK_EXT_IN   # or CLK_OUT depending on your board specs
+   phy_addr: 1
+   power_pin: GPIO16
+   id: eth
+
+
+script:
+  - id: play_with_power
+    parameters:
+      file_number: int
+    then:
+      - if:
+          condition:
+            switch.is_on: voeding9v
+          then:
+            - lambda: 'id(voeding9v_was_on) = true;'
+          else:
+            - lambda: 'id(voeding9v_was_on) = false;'
+            - switch.turn_on: voeding9v
+      - dfplayer.play_mp3:
+          file: !lambda 'return file_number;'
+
+#script:
+  - id: play_selected_track
+    then:
+      - if:
+          condition:
+            switch.is_on: voeding9v
+          then:
+            - lambda: 'id(voeding9v_was_on) = true;'
+          else:
+            - lambda: 'id(voeding9v_was_on) = false;'
+            - switch.turn_on: voeding9v
+      - dfplayer.play_mp3:
+          file: !lambda 'return (int)id(selected_track).state;'
+
+ 
+  # ... (je bestaande scripts)
+
+  - id: stop_na_pauze
+    then:
+      - delay: 5min
+      - logger.log: "Mediaspeler was 5 minuten gepauzeerd. Nu gestopt."
+      - media_player.stop: i2s_player
+
+display:
+  - platform: ssd1306_i2c  
+    model: "SSD1306 128x32"     
+    id : my_display
+    address: 0x3C
+    update_interval: never   # disable automatic refresh
+
+button:
+  - platform: restart
+    name: "Reboot Device"
+    entity_category: "diagnostic"
+    icon: "mdi:restart"
+
+#button:
+  - platform: template
+    name: uno
+    id: uno    
+    on_press:
+      then:
+        - script.execute:
+            id: play_with_power
+            file_number: 1 
+
+  - platform: template
+    name: deux
+    id: deux     
+    on_press:
+      then:
+        - script.execute:
+            id: play_with_power
+            file_number: 2
+
+  - platform: template
+    name: troix
+    id: troix     
+    on_press:
+      then:
+        - script.execute:
+            id: play_with_power
+            file_number: 3
+
+  - platform: template
+    name: quatre
+    id: quatre     
+    on_press:
+      then:
+        - script.execute:
+            id: play_with_power
+            file_number: 4       
+
+  - platform: template
+    name: cinq
+    id: cinq
+    on_press:
+      then:
+        - script.execute:
+            id: play_with_power
+            file_number: 5
+
+  - platform: template
+    name: playpresetnumber
+    id: playpresetnumber
+    on_press:
+      then:
+        - script.execute: 
+            id: play_with_power
+            file_number:  !lambda 'return (int) id(selected_track).state;'
+
+#button:
+  - platform: template
+    name: my_drukknopdf_luider
+    id: my_drukknopdf_luider
+    # Optional variables:
+    icon: "mdi:volume-plus"
+    on_press:
+      - logger.log: "Button my_drukknopdf_luider pressed"  
+      - dfplayer.volume_up
+ 
+#button:
+  - platform: template
+    name: my_drukknopdf_stiller
+    id: my_drukknopdf_stiller
+    # Optional variables:
+    icon: "mdi:volume-minus"
+    on_press:
+      - logger.log: "Button my_drukknopdf_stiller pressed"  
+      - dfplayer.volume_down
+
+#button: 
+  - platform: template
+    name: radio2
+    id: radio2drukknop
+    icon: "mdi:emoticon-outline"
+    on_press:
+      - logger.log: "radio 2 pressed" 
+      - media_player.volume_set:
+          id: i2s_player
+          volume: 0.3
+      - delay: 0.1s
+      - media_player.play_media:
+          id: i2s_player
+          media_url: "http://icecast.vrtcdn.be/ra2wvl-mid.mp3"
+      - lambda: |-
+          id(my_display).fill(COLOR_OFF);   // wis scherm
+          id(my_display).print(0, 12, id(font1), "Radio2");
+          id(my_display).update();
+
+#button:
+  - platform: template
+    name: buzzerCarolBells
+    id: buzzerCarolBells
+    icon: "mdi:emoticon-outline"
+    on_press:
+      - rtttl.play:  'CarolBells:d=8,o=5,b=180:4a,g#,a,4f#,4a,g#,a,4f#,4f#6,f#6,f#6,e6,d6,4c#6,c#6,c#6,b,a,4b,b,b,c#6,b,4f#,f#,f#,4f#,c#,d#,e,f#,g#,a,b,c#6,4b,4a,c#,d#,e,f#,g#,a,b,c#6,4b,4a,4a,g#,a,4f#,4a,g#,a,4f#'
+
+  - platform: template
+    name: buzzerlocked
+    id: buzzerlocked
+    icon: "mdi:emoticon-outline"
+    on_press:
+      - rtttl.play: 'locked:d=4,o=5,b=140:32d6,32p,32d6'
+        
+  - platform: template
+    name: buzzeropen
+    id: buzzeropen
+    icon: "mdi:emoticon-outline"
+    on_press:
+      - rtttl.play: 's:d=4,o=5,b=125:32b4 '
+ 
+dfplayer:
+  uart_id: uartmp3player
+
+  on_finished_playback:
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(voeding9v_was_on);'
+          then:
+            - switch.turn_off: voeding9v
+
+uart:
+  - id: uartmp3player
+    tx_pin: GPIO17     # pin 5 on your header
+    rx_pin: GPIO5      # pin 4 on your header
+    baud_rate: 9600
+
+# Example configuration entry  sd(data of dout of din) 32     ws 15 (Clk of lrck )      sck 14 (Blck )       master niet
+i2s_audio:
+  i2s_lrclk_pin: GPIO15
+  i2s_bclk_pin: GPIO12
+
+ 
+
+media_player:
+  - platform: i2s_audio
+    name: Voice Assistant Speaker
+    dac_type: external
+    i2s_dout_pin: GPIO14
+    mode: stereo
+    id: i2s_player
+    on_state:
+      # --- START NIEUWE LOGICA ---
+      - if:
+          condition:
+            media_player.is_paused: i2s_player
+          then:
+            # Start de 5-minuten timer om te stoppen
+            - script.execute: stop_na_pauze
+            # Update het display (jouw bestaande code)
+            - lambda: |-
+                id(my_display).fill(COLOR_OFF);
+                id(my_display).printf(0, 12, id(font1), "Gepauzeerd");
+                id(my_display).update();
+          else:
+            # Als de speler niet gepauzeerd is (bv. speelt of gestopt), annuleer de timer.
+            - script.stop: stop_na_pauze
+            - lambda: |-
+                id(my_display).fill(COLOR_OFF);
+                id(my_display).printf(0, 12, id(font1), "playing...");
+                id(my_display).update();
+      # --- EINDE NIEUWE LOGICA ---
+
+      # Jouw bestaande logica om de 9V voeding aan te zetten tijdens het spelen
+      - if:
+          condition:
+            media_player.is_playing: i2s_player
+          then:
+            - switch.turn_on: voeding9v
+
+    on_idle:
+      - delay: 105s
+      - if:
+          condition:
+            media_player.is_idle: i2s_player
+          then:
+            - switch.turn_off: voeding9v            
+
+number:
+  - platform: template
+    name: "DFPlayer Volume"
+    id: dfplayer_volume
+    min_value: 0
+    max_value: 30
+    step: 1
+    initial_value: 15
+    optimistic: true
+    set_action:
+      - dfplayer.set_volume:
+          volume: !lambda 'return x;'
+
+#number:
+  - platform: template
+    name: "Select MP3 Track"
+    id: selected_track
+    optimistic: true
+    mode: BOX
+    min_value: 1
+    max_value: 99
+    step: 1
+    initial_value: 7
+    restore_value: true
+    set_action:
+      - logger.log: "MP3 track changed"
+      #- script.execute:
+       #   id: play_with_power
+        #  file_number: !lambda 'return (int) x;'    
+
+text_sensor:
+  - platform: ethernet_info
+    ip_address:
+      name: "LAN_IP"
+      id: eth_ip
+      update_interval: 250s
+      internal: True
+ 
+#text_sensor:
+  - platform: homeassistant
+    id: ha_title
+    entity_id: media_player.wt32kip_voice_assistant_speaker_2
+    attribute: media_title
+    internal: True
+    filters:
+      - lambda: |-
+          static std::string last = "";
+          std::string s = x;
+          // trim leading/trailing whitespace
+          size_t start = s.find_first_not_of(" \n\r\t");
+          if (start == std::string::npos) {
+            s = "";
+          } else {
+            size_t end = s.find_last_not_of(" \n\r\t");
+            s = s.substr(start, end - start + 1);
+          }
+          if (s == last) return {};    // unchanged -> discard
+          last = s;
+          return s;                    // changed -> pass through
+    on_value:
+      then:
+        - lambda: |-
+            id(my_display).fill(COLOR_OFF);
+            id(my_display).printf(0, 0, id(font3), "IP: %s", id(eth_ip).state.c_str());
+            id(my_display).printf(0, 10, id(font3), "Title: %s", id(ha_title).state.c_str());
+            id(my_display).printf(0, 20, id(font3), "Artist: %s", id(ha_artist).state.c_str());
+            id(my_display).update();
+ 
+  - platform: homeassistant
+    id: ha_artist
+    entity_id: media_player.wt32kip_voice_assistant_speaker_2
+    attribute: media_artist
+    internal: True
+    filters:
+      - lambda: |-
+          static std::string last = "";
+          std::string s = x;
+          // trim leading/trailing whitespace
+          size_t start = s.find_first_not_of(" \n\r\t");
+          if (start == std::string::npos) {
+            s = "";
+          } else {
+            size_t end = s.find_last_not_of(" \n\r\t");
+            s = s.substr(start, end - start + 1);
+          }
+          if (s == last) return {};    // unchanged -> discard
+          last = s;
+          return s;                    // changed -> pass through
+    on_value:
+      then:
+        - lambda: |-
+            id(my_display).fill(COLOR_OFF);
+            id(my_display).printf(0, 0, id(font3), "IP: %s", id(eth_ip).state.c_str());
+            id(my_display).printf(0, 10, id(font3), "Title: %s", id(ha_title).state.c_str());
+            id(my_display).printf(0, 20, id(font3), "Artist: %s", id(ha_artist).state.c_str());
+            id(my_display).update();
+
+sensor:
+  - platform: rotary_encoder
+    name: "volumeknop36/39"
+    id: rotary36_39
+    pin_a: GPIO39
+    pin_b: GPIO36
+    internal: True
+    resolution: 4
+    min_value: 0
+    max_value: 100   
+    filters:
+      - throttle: 100ms   # only update every 200ms  
+    on_value:
+      then:
+        - media_player.volume_set:
+            id: i2s_player
+            volume: !lambda 'return (float)x / 100.0;'
+        - dfplayer.set_volume: 
+            volume: !lambda 'return (int)(x * 30 / 100);'   
+
+#sensor:
+  - platform: homeassistant
+    id: ha_volume
+    entity_id: media_player.wt32kip_voice_assistant_speaker_2
+    internal: True
+    on_value:
+      then:
+        - lambda: |-
+            float ha_vol = id(ha_volume).state;
+            if ((int)(ha_vol * 100) != id(rotary36_39).state) {
+              id(rotary36_39).publish_state((int)(ha_vol * 100));
+            }    
+
+# Example configuration entry
+mcp23017:
+  - id: 'mcp23017_hub'
+    address: 0x20
+
+# Individual outputs
+switch:
+  - platform: gpio
+    name: "MCP23017 9V voedng Luikje + Amp A0"
+    id : voeding9v
+    pin:
+      mcp23xxx: mcp23017_hub
+      # Use pin A0
+      number: 0
+      mode:
+        output: true
+      inverted: True
+
+# Individual outputs
+#switch:
+  - platform: gpio
+    name: "MCP23017 rel2 A1"
+    id : rel2
+    pin:
+      mcp23xxx: mcp23017_hub
+      # Use pin A1
+      number: 1
+      mode:
+        output: true
+      inverted: True
+
+# Individual outputs
+#switch:
+  - platform: gpio
+    name: "MCP23017 rolop A2"
+    id : rolop
+    pin:
+      mcp23xxx: mcp23017_hub
+      # Use pin A1
+      number: 2
+      mode:
+        output: true
+      inverted: True
+
+# Individual outputs
+#switch:
+  - platform: gpio
+    name: "MCP23017 rolneer A3"
+    id : rolneer
+    pin:
+      mcp23xxx: mcp23017_hub
+      # Use pin A2
+      number: 3
+      mode:
+        output: true
+      inverted: True      
+
+# Individual inputs
+binary_sensor:
+  - platform: gpio
+    name: "MCP23017 inp deurcontact B7"
+    id : inputdeur
+    pin:
+      mcp23xxx: mcp23017_hub
+      # Use pin B7
+      number: 15
+      # One of INPUT or INPUT_PULLUP
+      mode:
+        input: true
+        pullup: true
+      inverted: false
+      #interrupt: CHANGE     # Makes MCP23017 trigger INT pin on any change
+
+#binary_sensor:
+  - platform: gpio
+    name: "MCP23017cover_limit_closed B6"
+    id : cover_limit_closed
+    pin:
+      mcp23xxx: mcp23017_hub
+      # Use pin B6
+      number: 14
+      # One of INPUT or INPUT_PULLUP
+      mode:
+        input: true
+        pullup: true
+      inverted: True
+      #interrupt: CHANGE     # Makes MCP23017 trigger INT pin on any change
+
+#binary_sensor:
+  - platform: gpio
+    name: "MCP23017cover_limit_opened B5"
+    id : cover_limit_opened
+    pin:
+      mcp23xxx: mcp23017_hub
+      # Use pin B5
+      number: 13
+      # One of INPUT or INPUT_PULLUP
+      mode:
+        input: true
+        pullup: true
+      inverted: True
+      #interrupt: CHANGE     # Makes MCP23017 trigger INT pin on any change
+  
+#binary_sensor:
+  - platform: gpio
+    name: "MCP23017mediapauze B4"
+    id : mediapauze #(drukknop in de volumeknop)
+    internal: True
+    pin:
+      mcp23xxx: mcp23017_hub
+      # Use pin B5
+      number: 12
+      # One of INPUT or INPUT_PULLUP
+      mode:
+        input: true
+        pullup: true
+      inverted: True
+      #interrupt: CHANGE     # Makes MCP23017 trigger INT pin on any change
+    on_click:
+      # korte druk: tot 2999ms -> pauzeer/hersteld (toggle)
+      - min_length: 0ms
+        max_length: 1000ms
+        then:
+          - media_player.toggle: i2s_player
+
+      # lange druk: >=3000ms -> simuleer drukken van een andere knop
+      - min_length: 3000ms
+        max_length: 5000ms
+        then:
+          - lambda: |-
+              id(my_display).fill(COLOR_OFF);   // wis scherm
+              id(my_display).print(0, 12, id(font1), "lang gedrukt");
+              id(my_display).update();    
+          - delay : 1s
+          - button.press: radio2drukknop          
+
+#binary_sensor:
+  - platform: gpio
+    pin:
+      number: 35
+      mode:
+        input: true
+      inverted: false
+    name: "Input GPIO35"
+
+globals:
+  - id: voeding9v_was_on
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+cover:
+  - platform: endstop
+    name: "Endstop Cover"
+    max_duration: 15s     
+    open_action:
+      - lambda: |-
+          if (id(voeding9v).state) {
+            id(voeding9v_was_on) = true;
+          } else {
+            id(voeding9v_was_on) = false;
+            id(voeding9v).turn_on();
+          }
+      - switch.turn_on: rolop
+    open_duration: 10s
+    open_endstop: cover_limit_opened
+    close_action:
+      - lambda: |-
+          if (id(voeding9v).state) {
+            id(voeding9v_was_on) = true;
+          } else {
+            id(voeding9v_was_on) = false;
+            id(voeding9v).turn_on();
+          }
+      - switch.turn_on: rolneer
+    close_duration: 10s
+    close_endstop: cover_limit_closed
+    stop_action:
+      - switch.turn_off: rolop
+      - switch.turn_off: rolneer
+      - lambda: |-
+          if (!id(voeding9v_was_on)) {
+            id(voeding9v).turn_off();
+          }
+
+output:
+  - platform: ledc
+    pin: GPIO4
+    id: buzzer_output
+
+rtttl:
+  output: buzzer_output
+
+ 
