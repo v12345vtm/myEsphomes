@@ -1,0 +1,470 @@
+globals:
+  - id: maandpiek_value
+    type: float          # numeric type
+    restore_value: yes
+    initial_value: "2.5"   # minimum fallback
+
+esphome:
+  name: wt32-domotica
+  friendly_name: WT32-domotica
+  on_boot:
+    then:
+      - delay: 1s
+ 
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+ 
+logger:
+ 
+api:
+  encryption:
+    key: "JFGVLhXoFrzpQ3uin6GvSxfHeowyUcAYV/zYCB4nxAE="
+
+ota:
+  - platform: esphome
+    password:  "0015987e525a5a8eebc840e1acff24dc"
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk:
+    pin: GPIO0
+    mode: CLK_EXT_IN   # or CLK_OUT depending on your board specs
+  phy_addr: 1
+  power_pin: GPIO16
+  id: eth
+
+datetime:
+  - platform: template
+    id: time_nacht_start
+    type: time
+    name: "Nacht_start"
+    optimistic: true
+    initial_value: "21:30:00"
+    restore_value: true
+    icon : "mdi:weather-sunset-down"
+
+  - platform: template
+    id: time_nacht_stopt
+    type: time
+    name: "Nacht_stop"
+    optimistic: true
+    initial_value: "07:45:00"
+    restore_value: true 
+    icon : "mdi:weather-sunset-up"
+ 
+dsmr:
+  request_interval : 5s
+  max_telegram_length: 4700 #22/10/2025 vab6500nr 1700 omdat peak niet logt  6500 #1700  #1500 is te weinig
+  crc_check: false
+  receive_timeout : 6s
+  uart_id: uartbus
+
+binary_sensor:
+  - platform: template
+    name: "P1 Uart error"  #alsde esp 3minuten geen data verandering ziet = error
+    id: voltage_unchanged_warning
+    entity_category: diagnostic
+    lambda: |-
+      static float last_voltage = -1;
+      static unsigned long last_change_time = 0;
+      float current_voltage = id(voltage_l1).state;  // Make sure 'voltage_l1' sensor has id voltage_l1
+      unsigned long now = millis();
+      if (current_voltage != last_voltage) {
+        last_voltage = current_voltage;
+        last_change_time = now;
+        return false;  // No warning, voltage changed
+      }
+      // Check if voltage unchanged for over 3 minutes (180000 ms)
+      if ((now - last_change_time) > 180000) {
+        return true;  // Warning, voltage unchanged for 3 minutes
+      }
+      return false;  // No warning yet
+
+  - platform: template
+    name: "Verwitteging van ingestelde drempel"
+    id: peak_above_limit
+    entity_category: diagnostic
+    icon : "mdi:facebook-messenger"
+    lambda: |-
+      float demand = id(active_energy_import_current_average_demand).state;
+      float threshold = atof(id(VerwittigMeOpKwh).state.c_str());  // convert text input to float
+      if (isnan(demand) || isnan(threshold)) {
+        return false;  // safety fallback
+      }
+      if (demand > threshold) {
+        return true;   // ON when above threshold
+      } else {
+        return false;  // OFF otherwise
+      }
+
+#binary_sensor:
+  - platform: template
+    name: "Send SMS Trigger"
+    id: send_sms_trigger
+    icon : "mdi:phone-clock"
+    entity_category: diagnostic
+    lambda: |-
+      if (id(peak_above_limit).state && !id(niet_storen_tussen).state)
+        return true;
+      else
+        return false;
+ 
+#binary_sensor: 
+  - platform: template
+    name: "Niet Storen"
+    id: niet_storen_tussen
+    entity_category: diagnostic
+    icon: "mdi:bell-sleep"
+    lambda: |-
+      // If main_switch is ON, do not activate "Do Not Disturb"
+      if (id(main_switch).state) return false;
+      // Get current time from SNTP
+      auto now = id(my_time).now();
+      int now_minutes = now.hour * 60 + now.minute;
+      int start_minutes = id(time_nacht_start).hour * 60 + id(time_nacht_start).minute;
+      int stop_minutes  = id(time_nacht_stopt).hour * 60 + id(time_nacht_stopt).minute;
+      // Check if current time is within range
+      if (start_minutes <= stop_minutes) {
+        return now_minutes >= start_minutes && now_minutes < stop_minutes;
+      } else {
+        // Time range spans midnight
+        return now_minutes >= start_minutes || now_minutes < stop_minutes;
+      }
+#######
+text_sensor:
+  - platform: dsmr
+    identification:
+      name: "DSMR Identification"
+      entity_category: diagnostic
+ 
+    electricity_tariff :
+      name : "Teller40A"  
+      entity_category: diagnostic
+      filters:
+        - map:
+          - 0001 -> dagtarief
+          - 0002 -> nachtarief
+
+#text_sensor:
+  - platform: template
+    name: "Kwartier Tijdstip"
+    id: laatste_maandpiek_tijdstip
+    entity_category: diagnostic
+    icon: "mdi:clock-check-outline"
+ 
+#text_sensor: 
+  - platform: template
+    name: "Capaciteitstarief Status Text"
+    update_interval: 60s
+    entity_category: diagnostic
+    lambda: |-
+      float pct = id(capaciteitstarief_pct_until_burned).state;
+      if (pct < 0) return {"Invalid"};
+      if (pct >= 100) return {">100% - Verbrand voor de rest van de maand"};
+      if (pct >= 90)  return {">90% - Hoog, bijna aan limiet. Leg iets af!"};
+      if (pct >= 80)  return {">80% - Redelijk hoog."};
+      if (pct >= 70)  return {">70% - Matig hoog."};
+      if (pct >= 60)  return {">60% - Licht verhoogd."};
+                      return {"<60% - Veilig verbruik."};
+##################  
+sensor:
+  - platform: dsmr
+    active_energy_import_maximum_demand_last_13_months : 
+      #piekvermogen hoogste van de voorbije 13maanden
+      name : "Capaciteitstarief jaar"
+      icon : mdi:calendar-blank-multiple
+
+    active_energy_import_maximum_demand_running_month : #piekvermogen deze maand
+      id : active_energy_import_maximum_demand_running_month
+      name : "Capaciteitstarief huidige maand"
+      icon : "mdi:calendar-month"
+
+    active_energy_import_current_average_demand : #15minuten piekmeting
+      name : "Capaciteitstarief 15min"      
+      id: active_energy_import_current_average_demand
+      icon : "mdi:summit"
+      on_value_range:
+        - below: 5.0
+          then:
+            - logger.log: "onder5"
+        - above: 0.0
+          below: 0.1
+          then:
+            - globals.set:
+                id: maandpiek_value
+                value: !lambda 'return id(active_energy_import_maximum_demand_running_month).state;'
+            - logger.log: "📈 maandpiek captured!"           
+            - lambda: |-
+                ESP_LOGI("maandpiek", "Current maandpiek_value: %.3f", id(maandpiek_value)); 
+            - text_sensor.template.publish:
+                id: laatste_maandpiek_tijdstip     
+                state: !lambda 'return id(my_time).now().strftime("%H:%M:%S").c_str();'
+      
+#********
+    energy_delivered_tariff1:
+      name: "Energy Consumed Dag Tariff"  #dit zit in energy dashboard
+      id : slimmemeter_elec_dag
+      icon : "mdi:weather-sunny"
+
+    energy_delivered_tariff2:
+      name: "Energy Consumed Nacht Tariff"  #dit zit in energy dashboard
+      id : slimmemeter_elec_nacht
+      icon : "mdi:moon-waning-crescent"
+ 
+    power_delivered:
+      name: "Power Consumed"  #tis is totaal moest je meerdere fasen hebben ( fase1 + fase2 + fase3)
+      accuracy_decimals: 3
+      internal: True
+
+    power_delivered_l1:
+      name: "Power Consumed Phase 1"
+      accuracy_decimals: 3
+      icon : "mdi:power-plug"      
+ 
+    electricity_long_failures:
+      name: "Long Electricity Failures"
+      icon: mdi:alert
+      internal: True
+
+    voltage_l1:
+      name: "Spanning V"
+      id: voltage_l1
+      icon : "mdi:lightning-bolt-outline"
+
+    current_l1:
+      name: "Verbruik A"
+      icon : "mdi:current-ac"
+ 
+    gas_delivered_be :
+      name: "Gas Consumed BE"  
+      id : slimmegasmeter
+      icon : "mdi:gas-burner"
+ #     filters:
+ #       - clamp:
+ #           min_value: 0.0
+ #           max_value: 1000.0
+ #           ignore_out_of_range: true #meer dan 1kuub gas in 1meting kan niet 
+   
+    water_delivered:
+      name: "Water Consumed"
+      icon : "mdi:cup-water"
+      id : slimmewatermeter
+      device_class: water
+      unit_of_measurement: "m³"
+      #state_class: total_increasing       #walkaround ff weggedaan op 23okt2025
+#      filters:
+#      - clamp:
+#          min_value: 0.0
+#          max_value: 1000.0
+#          ignore_out_of_range: true #meer dan 1kuub water in 1meting kan niet 
+
+
+#  - platform: total_daily_energy
+#    name: "Gas DagTot." #werkt niet de totaal denkt dat je incremental de flow per uur is
+#    id : dagelijksegas
+#    power_id: slimmegasmeter
+
+#  - platform: total_daily_energy
+#    name: "Water DagTot."
+#    id : dagelijksewater
+#    power_id: slimmewatermeter
+
+#  - platform: total_daily_energy
+#    name: "Elec Overdag Tot."
+#    id : dagelijksestroom_dag
+#    power_id: slimmemeter_elec_dag
+
+#  - platform: total_daily_energy
+#    name: "Elec Overnacht Tot."
+#    id : dagelijksestroom_nacht
+#    power_id: slimmemeter_elec_nacht
+
+#sensor: ivm prijzen
+  - platform: template
+    name: "Gasprijs incl. BTW"
+    id: gasprijs_incl_btw
+    icon : "mdi:gas-burner"
+    unit_of_measurement: "€/m³"
+    accuracy_decimals: 3
+    lambda: |-
+      return atof(id(gas_euro_per_kuub).state.c_str());
+
+  - platform: template
+    name: "Waterprijs incl. BTW"
+    id: waterprijs_incl_btw
+    icon : "mdi:cup-water"
+    unit_of_measurement: "€/L"
+    accuracy_decimals: 5
+    lambda: |-
+      return atof(id(water_euro_per_liter).state.c_str());
+
+  - platform: template
+    name: "Elecprijs incl. BTW"
+    id: stroomprijs_incl_btw
+    icon: "mdi:currency-eur"
+    unit_of_measurement: "€/kWh"
+    accuracy_decimals: 3
+    lambda: |-
+      return atof(id(stroom_per_kwh).state.c_str());
+
+#sensor:
+  - platform: template
+    name: "Water Flow Rate"
+    id: water_flow_rate
+    unit_of_measurement: "L/min"
+    icon: "mdi:water-pump"
+    accuracy_decimals: 2
+    update_interval: 60s
+    lambda: |-
+      static float last_value = 0;
+      static unsigned long last_time = 0;
+      float current_value = id(slimmewatermeter).state;  // m³ total
+      unsigned long now = millis();
+      if (isnan(current_value)) return NAN;
+      // First run → just initialize
+      if (last_time == 0) {
+        last_time = now;
+        last_value = current_value;
+        return 0;
+      }
+      float delta_m3 = current_value - last_value;
+      float delta_minutes = (now - last_time) / 60000.0;  // ms → minutes
+      last_value = current_value;
+      last_time = now;
+      if (delta_m3 < 0) return 0;  // safety in case of reset
+      float liters_per_min = delta_m3 * 1000.0 / delta_minutes;  // m³ → L
+      return liters_per_min;
+
+#sensor:
+  - platform: template
+    name: "Gas Flow Rate"
+    id: gas_flow_rate
+    unit_of_measurement: "L/min"
+    icon: "mdi:fire-circle"
+    accuracy_decimals: 2
+    update_interval: 60s
+    lambda: |-
+      static float last_value = 0;
+      static unsigned long last_time = 0;
+      float current_value = id(slimmegasmeter).state;  // m³ total
+      unsigned long now = millis();
+      if (isnan(current_value)) return NAN;
+      // First run → just initialize
+      if (last_time == 0) {
+        last_time = now;
+        last_value = current_value;
+        return 0;
+      }
+      float delta_m3 = current_value - last_value;
+      float delta_minutes = (now - last_time) / 60000.0;  // ms → minutes
+      last_value = current_value;
+      last_time = now;
+      if (delta_m3 < 0) return 0;  // safety in case of reset
+      float liters_per_min = delta_m3 * 1000.0 / delta_minutes;  // m³ → L
+      return liters_per_min;
+
+#sensor:
+  - platform: template
+    name: "Capaciteitstarief hoeveel % tegen verbrand deze maand (van2.5kw tot ...)"
+    id: capaciteitstarief_pct_until_burned
+    update_interval: 60s
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    lambda: |-
+      float current = id(active_energy_import_current_average_demand).state;
+      float limit_raw = id(maandpiek_value);
+      float limit = (limit_raw >= 2.5) ? limit_raw : 2.5;
+      if (limit <= 0) return 0;
+      float pct = (current / limit) * 100.0;
+      return round(pct * 10) / 10.0;
+##############################
+button:
+  - platform: restart
+    name: "wt32eth restart"     
+
+#p1poort ###################################
+uart:
+  id : uartbus
+  rx_buffer_size: 9000 # 6000 op 20/10/25  #1700
+  rx_pin:
+    number: 4  # https://smart-stuff.nl/p1-ethernet-dongle/
+    inverted: false
+    mode:
+      input: true
+      pullup: false
+  baud_rate: 115200 
+###############################################
+text:
+  - platform: template
+    name: "VerwittigMeOpKwh"
+    id: VerwittigMeOpKwh
+    optimistic: true
+    restore_value: true
+    mode: text
+    initial_value: "3"
+    on_value:
+      - logger.log:
+          format: "VerwittigMeOpKwh set to: %s"
+          args: [x.c_str()]
+
+  - platform: template
+    name: "Eenheidsprijs gas incl_btw"
+    id: gas_euro_per_kuub
+    icon : "mdi:currency-eur"
+    optimistic: true
+    mode: text
+    restore_value: true
+    initial_value: "0.9"
+    on_value:
+      - logger.log:
+          format: "Gas incl BTW = %s €/m³"
+          args: [x.c_str()]
+      - lambda: |-
+          id(gasprijs_incl_btw).publish_state(atof(x.c_str()));
+
+  - platform: template
+    name: "Eenheidsprijs water incl_btw"
+    id: water_euro_per_liter
+    icon : "mdi:currency-eur"
+    optimistic: true
+    mode: text
+    restore_value: true
+    initial_value: "0.0072"
+    on_value:
+      - logger.log:
+          format: "Water incl BTW = %s €/L"
+          args: [x.c_str()]
+      - lambda: |-
+          id(waterprijs_incl_btw).publish_state(atof(x.c_str()));
+
+  - platform: template
+    name: "Eenheidsprijs elec incl_btw"
+    icon : "mdi:currency-eur"
+    id: stroom_per_kwh
+    optimistic: true
+    mode: text
+    restore_value: true
+    initial_value: "0.37"
+    on_value:
+      - logger.log:
+          format: "Stroom incl BTW = %s €/kWh"
+          args: [x.c_str()]
+      - lambda: |-
+          id(stroomprijs_incl_btw).publish_state(atof(x.c_str()));
+############################################
+switch:
+  - platform: template
+    id: main_switch
+    name: "24/24h sms"
+    restore_mode: RESTORE_DEFAULT_OFF
+    optimistic: True
+
+############## 
+time:
+  - platform: sntp
+    id: my_time
+    timezone: "Europe/Brussels"
