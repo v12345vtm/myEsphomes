@@ -85,7 +85,7 @@ binary_sensor:
       return false;  // No warning yet
 
   - platform: template
-    name: "Verwitteging van ingestelde drempel"
+    name: "Verwitteging van ingestelde drempel" #op capaciteits tarief 15min
     id: peak_above_limit
     entity_category: diagnostic
     icon : "mdi:facebook-messenger"
@@ -400,7 +400,7 @@ uart:
 ###############################################
 text:
   - platform: template
-    name: "VerwittigMeOpKwh"
+    name: "Capa_VerwittigMeOpKwh" #capaciteitstarief 15m
     id: VerwittigMeOpKwh
     optimistic: true
     restore_value: true
