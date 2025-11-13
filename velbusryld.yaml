@@ -118,6 +118,7 @@ text_sensor:
       name: "ip"
       id: ip
       update_interval: 1500s
+      internal: True
  
 
   - platform: template

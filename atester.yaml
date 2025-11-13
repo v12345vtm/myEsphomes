@@ -14,10 +14,7 @@ esp32:
 web_server:
   port: 80
     
-
-external_components:
-  - source: github://stas-sl/esphome-sound-level-meter
-
+ 
 # Enable logging
 logger:
   level: DEBUG
@@ -40,108 +37,13 @@ wifi:
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
-    ssid: "Esp32-02 Fallback Hotspot"
-    password: "eVv4rVmMxxfi"
+    ssid: "atester"
+    password: "kipkipkip"
 
 captive_portal:
 
-# ---------------------------
-
-# INMP441 I2S MEMS microphone
-# VDD  3V3
-# GND  GND
-# SD   D26
-# L/R  GND
-# WS   D25
-# SCK  D5
-
-status_led:
-  pin: 2
-
-i2s:
-  bck_pin: GPIO14        # SCK
-  ws_pin: GPIO15       # WS
-  din_pin: GPIO32       # SD
-  sample_rate: 48000            # default: 48000
-  bits_per_sample: 32           # default: 32
-
-  # right shift samples.
-  # for example if mic has 24 bit resolution, and i2s configured as 32 bits,
-  # then audio data will be aligned left (MSB) and LSB will be padded with
-  # zeros, so you might want to shift them right by 8 bits
-  
-  bits_shift: 8                 # default: 0
-
-sound_level_meter:
-  id: sound_level_meter1
-
-  # update_interval specifies over which interval to aggregate audio data
-  # you can specify default update_interval on top level, but you can also
-  # override it further by specifying it on sensor level
-
-  update_interval: 1s           # default: 60s
-
-  # buffer_size is in samples (not bytes), so for float data type
-  # number of bytes will be buffer_size * 4
-
-  buffer_size: 1024             # default: 1024
-
-  # see your mic datasheet to find sensitivity and reference SPL.
-  # those are used to convert dB FS to db SPL
-
-  mic_sensitivity: -26dB        # default: empty
-  mic_sensitivity_ref: 94dB     # default: empty
-
-  # for flexibility sensors are organized hierarchically into groups.
-  # each group can have any number of filters, sensors and nested groups.
-  # for examples if there is a top level group A with filter A and nested
-  # group B with filter B, then for sensors inside group B filters A
-  # and then B will be applied:
-  # groups:
-  #   # group A
-  #   - filters:
-  #       - filter A
-  #     groups:
-  #       # group B
-  #       - filters:
-  #           - filter B
-  #         sensors:
-  #           - sensor X
-
-  groups:
-    - sensors:
-        - type: eq
-          name: Leq_1s
-
-# automation
-# available actions:
-#   - sound_level_meter.turn_on
-#   - sound_level_meter.turn_off
-#   - sound_level_meter.toggle
-
-switch:
-  - platform: template
-    name: "Decibel Meter ON / OFF"
-    lambda: |-
-      return id(sound_level_meter1).is_on();
-    turn_on_action:
-      then: sound_level_meter.turn_on
-    turn_off_action:
-      then: sound_level_meter.turn_off
-    restore_mode: RESTORE_DEFAULT_ON
-  - platform: restart
-    name: "Decibel Meter Reset"
-
-sensor:
-
-  - platform: wifi_signal
-    name: "WiFi ESP32 02"
-    update_interval: 60s  
-
-  - platform: internal_temperature
-    name: "Decibel Meter Temperature" 
-
-binary_sensor:
-  - platform: status
-    name: "Decibel Meter WiFi"
- 
+remote_receiver:
+  pin :
+    number : GPIO35 #GPIO18 #12niet op pcb vrij
+    inverted : True
+  dump: lg

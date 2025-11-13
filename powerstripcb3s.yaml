@@ -294,16 +294,7 @@ sensor:
     entity_category: "diagnostic"
     internal: true
 
-  - platform: copy
-    source_id: wifi_signal_db
-    name: "WiFi Signal Strength Percentage"
-    filters:
-      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
-    unit_of_measurement: "%"
-    entity_category: "diagnostic"
-    device_class: ""
-
-
+  
  #sensor:
   - platform: internal_temperature
     name: "Internal Temperature"    

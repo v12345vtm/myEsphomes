@@ -48,23 +48,7 @@ wifi:
 
 captive_portal:
 
-sensor:
-  - platform: wifi_signal
-    name: "WiFi Signal Strength dBm"
-    id: wifi_signal_db
-    update_interval: 60s
-    entity_category: "diagnostic"
-    internal: True
-
-  - platform: copy
-    source_id: wifi_signal_db
-    name: "WiFi Signal Strength Percentage"
-    filters:
-      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
-    unit_of_measurement: "%"
-    entity_category: "diagnostic"
-    device_class: ""
-
+ 
 
 
 button:

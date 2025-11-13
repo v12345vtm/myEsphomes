@@ -4,6 +4,34 @@ globals:
     restore_value: yes
     initial_value: "2.5"   # minimum fallback
 
+  # GAS tracking
+  - id: last_gas_total
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: daily_gas
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: monthly_gas
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+
+  # WATER tracking
+  - id: last_water_total
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: daily_water
+    type: float
+    restore_value: yes
+    initial_value: '0.0'
+  - id: monthly_water
+    type: float
+    restore_value: yes
+    initial_value: '0.0'    
+
 esphome:
   name: wt32-domotica
   friendly_name: WT32-domotica
@@ -78,8 +106,8 @@ binary_sensor:
         last_change_time = now;
         return false;  // No warning, voltage changed
       }
-      // Check if voltage unchanged for over 3 minutes (180000 ms)
-      if ((now - last_change_time) > 180000) {
+      // Check if voltage unchanged for over 1uur (in ms)
+      if ((now - last_change_time) > 3600000) {
         return true;  // Warning, voltage unchanged for 3 minutes
       }
       return false;  // No warning yet
@@ -222,8 +250,15 @@ sensor:
 
     power_delivered_l1:
       name: "Power Consumed Phase 1"
+      id : power_delivered_l1
       accuracy_decimals: 3
-      icon : "mdi:power-plug"      
+      icon : "mdi:power-plug"  
+      internal: False    
+      filters:
+        - sliding_window_moving_average:
+            window_size: 12   # number of samples in the window, adjust based on your actual sample rate
+            send_every: 12    # send averaged value every 12 samples (if samples are every 5 seconds, this equals 60 seconds)
+
  
     electricity_long_failures:
       name: "Long Electricity Failures"
@@ -234,10 +269,18 @@ sensor:
       name: "Spanning V"
       id: voltage_l1
       icon : "mdi:lightning-bolt-outline"
+      filters:
+        - sliding_window_moving_average:
+            window_size: 720   # number of samples in the window, adjust based on your actual sample rate
+            send_every: 720    # send averaged value every 12 samples (if samples are every 5 seconds, this equals 60 seconds)
 
     current_l1:
       name: "Verbruik A"
       icon : "mdi:current-ac"
+      filters:
+        - sliding_window_moving_average:
+            window_size: 6   # number of samples in the window, adjust based on your actual sample rate
+            send_every: 6    # send averaged value every 6 samples (if samples are every 5 seconds, this equals 30 seconds)      
  
     gas_delivered_be :
       name: "Gas Consumed BE"  
@@ -256,32 +299,8 @@ sensor:
       device_class: water
       unit_of_measurement: "m³"
       #state_class: total_increasing       #walkaround ff weggedaan op 23okt2025
-#      filters:
-#      - clamp:
-#          min_value: 0.0
-#          max_value: 1000.0
-#          ignore_out_of_range: true #meer dan 1kuub water in 1meting kan niet 
-
-
-#  - platform: total_daily_energy
-#    name: "Gas DagTot." #werkt niet de totaal denkt dat je incremental de flow per uur is
-#    id : dagelijksegas
-#    power_id: slimmegasmeter
-
-#  - platform: total_daily_energy
-#    name: "Water DagTot."
-#    id : dagelijksewater
-#    power_id: slimmewatermeter
-
-#  - platform: total_daily_energy
-#    name: "Elec Overdag Tot."
-#    id : dagelijksestroom_dag
-#    power_id: slimmemeter_elec_dag
-
-#  - platform: total_daily_energy
-#    name: "Elec Overnacht Tot."
-#    id : dagelijksestroom_nacht
-#    power_id: slimmemeter_elec_nacht
+ 
+ 
 
 #sensor: ivm prijzen
   - platform: template
@@ -382,6 +401,82 @@ sensor:
       float pct = (current / limit) * 100.0;
       return round(pct * 10) / 10.0;
 ##############################
+
+
+
+#sensor:
+
+ 
+  # ----- DAILY GAS -----
+  - platform: template
+    id: daily_gas_usage
+    icon: "mdi:sigma"
+    entity_category: diagnostic
+    name: "Gas Daily"
+    unit_of_measurement: "m³"
+    accuracy_decimals: 3
+    update_interval: 60s
+    lambda: |-
+      float current = id(slimmegasmeter).state;
+      float delta = current - id(last_gas_total);
+      if (delta >= 0) {
+        id(daily_gas) += delta;
+        id(monthly_gas) += delta;
+      }
+      id(last_gas_total) = current;
+      return id(daily_gas);
+
+  # ----- DAILY WATER -----
+  - platform: template
+    id: daily_water_usage
+    icon: "mdi:sigma"
+    entity_category: diagnostic
+    name: "Water Daily"
+    unit_of_measurement: "L"
+    accuracy_decimals: 1
+    update_interval: 60s
+    lambda: |-
+      float current = id(slimmewatermeter).state;
+      float delta = current - id(last_water_total);
+      if (delta >= 0) {
+        id(daily_water) += delta;
+        id(monthly_water) += delta;
+      }
+      id(last_water_total) = current;
+      return id(daily_water);
+
+  # ----- MONTHLY GAS -----
+  - platform: template
+    id: monthly_gas_usage
+    icon: "mdi:sigma"
+    entity_category: diagnostic
+    name: "Gas Monthly"
+    unit_of_measurement: "m³"
+    accuracy_decimals: 3
+    update_interval: 60s
+    lambda: |-
+      return id(monthly_gas);
+
+  # ----- MONTHLY WATER -----
+  - platform: template
+    id: monthly_water_usage
+    icon: "mdi:sigma"
+    entity_category: diagnostic
+    name: "Water Monthly"
+    unit_of_measurement: "L"
+    accuracy_decimals: 1
+    update_interval: 60s
+    lambda: |-
+      return id(monthly_water);
+ 
+
+
+
+
+
+
+
+###################""
 button:
   - platform: restart
     name: "wt32eth restart"     
@@ -455,6 +550,10 @@ text:
           args: [x.c_str()]
       - lambda: |-
           id(stroomprijs_incl_btw).publish_state(atof(x.c_str()));
+
+
+
+         
 ############################################
 switch:
   - platform: template
@@ -468,3 +567,24 @@ time:
   - platform: sntp
     id: my_time
     timezone: "Europe/Brussels"
+
+ 
+    # Reset daily counters at midnight
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 0
+        then:
+          - lambda: |-
+              id(daily_gas) = 0;
+              id(daily_water) = 0;
+
+      # Reset monthly counters on 1st of the month at midnight
+      - seconds: 0
+        minutes: 0
+        hours: 0
+        days_of_month: 1
+        then:
+          - lambda: |-
+              id(monthly_gas) = 0;
+              id(monthly_water) = 0;
