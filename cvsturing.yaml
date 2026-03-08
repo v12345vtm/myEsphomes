@@ -1,0 +1,934 @@
+#########################################################################################
+# CVSTURING - CV Switchboard Controller WITH MASTER GPA0 AUTO-LOGIC
+#
+# OVERZICHT:
+# - ESP32 + MCP23017 (16 digitale uitgangen: GPA0-GPB7)
+# - GPA0 = MASTER, automatisch AAN als minstens één uitgang actief is
+# - GPA1-GPB7 = individuele uitgangen, timers: 30 / 45 / 60 min
+# - Restore_mode: bij reboot worden uitgangen hersteld (veilig)
+#
+# LOGICA:
+# 1) Timer knop → script start → uitgang AAN
+# 2) Uitgang AAN → update_master script → GPA0_MASTER AAN
+# 3) Timer verloopt → uitgang UIT → update_master script
+# 4) Als geen uitgangen actief → MASTER UIT
+#
+# TIMERGEDRAG:
+# - 30 / 45 / 60 minuten
+# - Mode: restart → herstart timer als opnieuw ingedrukt
+#
+# VEILIGHEID:
+# - Uitgangen standaard UIT bij eerste boot
+# - Automatische mastercontrole
+# - Herstartknop beschikbaar
+#
+# NETWERK:
+# - WiFi + fallback hotspot
+# - Webinterface: poort 80
+# - Home Assistant API met encryptie
+#
+# EXTRA:
+# - Alle uitgangen kunnen handmatig via Web/HA worden bediend
+# - Master logica blijft actief bij manuele bediening
+#########################################################################################
+
+esphome:
+  name: cvsturing
+  friendly_name: CVsturing
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+api:
+  encryption:
+    key: "m0xWOzL+fZLAbGyv+qLpbfHEe4pLbIpQ8BpurWC7KWk="
+
+ota:
+  - platform: esphome
+    password: "f3e8c31b6ca49b8ba181071879a08854"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "CvsturingHotspot"
+    password: "kipkipkip"
+
+web_server:
+  port: 80
+
+
+captive_portal:
+
+i2c:
+  sda: GPIO32   # CFG
+  scl: GPIO33   # 485_EN
+  scan: False
+  id: bus_a
+
+button:
+  - platform: restart
+    name: "Reboot Device"
+    entity_category: "diagnostic"
+    icon: "mdi:restart"
+
+
+
+
+#button:
+
+  - platform: template
+    name: "⏰ GPA1 30min"
+    on_press:
+      - script.execute: timer_gpa1
+
+  - platform: template
+    name: "⏰ GPA2 30min"
+    on_press:
+      - script.execute: timer_gpa2
+
+  - platform: template
+    name: "⏰ GPA3 30min"
+    on_press:
+      - script.execute: timer_gpa3
+
+  - platform: template
+    name: "⏰ GPA4 30min"
+    on_press:
+      - script.execute: timer_gpa4
+
+  - platform: template
+    name: "⏰ GPA5 30min"
+    on_press:
+      - script.execute: timer_gpa5
+
+  - platform: template
+    name: "⏰ GPA6 30min"
+    on_press:
+      - script.execute: timer_gpa6
+
+  - platform: template
+    name: "⏰ GPA7 30min"
+    on_press:
+      - script.execute: timer_gpa7
+
+  - platform: template
+    name: "⏰ GPB0 30min"
+    on_press:
+      - script.execute: timer_gpb0
+
+  - platform: template
+    name: "⏰ GPB1 30min"
+    on_press:
+      - script.execute: timer_gpb1
+
+  - platform: template
+    name: "⏰ GPB2 30min"
+    on_press:
+      - script.execute: timer_gpb2
+
+  - platform: template
+    name: "⏰ GPB3 30min"
+    on_press:
+      - script.execute: timer_gpb3
+
+  - platform: template
+    name: "⏰ GPB4 30min"
+    on_press:
+      - script.execute: timer_gpb4
+
+  - platform: template
+    name: "⏰ GPB5 30min"
+    on_press:
+      - script.execute: timer_gpb5
+
+  - platform: template
+    name: "⏰ GPB6 30min"
+    on_press:
+      - script.execute: timer_gpb6
+
+  - platform: template
+    name: "⏰ GPB7 30min"
+    on_press:
+      - script.execute: timer_gpb7
+
+#buttons 45miuten
+  - platform: template
+    name: "⏰ GPA1 45min"
+    on_press:
+      - script.execute: timer_gpa1_45
+
+  - platform: template
+    name: "⏰ GPA2 45min"
+    on_press:
+      - script.execute: timer_gpa2_45
+
+  - platform: template
+    name: "⏰ GPA3 45min"
+    on_press:
+      - script.execute: timer_gpa3_45
+
+  - platform: template
+    name: "⏰ GPA4 45min"
+    on_press:
+      - script.execute: timer_gpa4_45
+
+  - platform: template
+    name: "⏰ GPA5 45min"
+    on_press:
+      - script.execute: timer_gpa5_45
+
+  - platform: template
+    name: "⏰ GPA6 45min"
+    on_press:
+      - script.execute: timer_gpa6_45
+
+  - platform: template
+    name: "⏰ GPA7 45min"
+    on_press:
+      - script.execute: timer_gpa7_45
+
+  - platform: template
+    name: "⏰ GPB0 45min"
+    on_press:
+      - script.execute: timer_gpb0_45
+
+  - platform: template
+    name: "⏰ GPB1 45min"
+    on_press:
+      - script.execute: timer_gpb1_45
+
+  - platform: template
+    name: "⏰ GPB2 45min"
+    on_press:
+      - script.execute: timer_gpb2_45
+
+  - platform: template
+    name: "⏰ GPB3 45min"
+    on_press:
+      - script.execute: timer_gpb3_45
+
+  - platform: template
+    name: "⏰ GPB4 45min"
+    on_press:
+      - script.execute: timer_gpb4_45
+
+  - platform: template
+    name: "⏰ GPB5 45min"
+    on_press:
+      - script.execute: timer_gpb5_45
+
+  - platform: template
+    name: "⏰ GPB6 45min"
+    on_press:
+      - script.execute: timer_gpb6_45
+
+  - platform: template
+    name: "⏰ GPB7 45min"
+    on_press:
+      - script.execute: timer_gpb7_45
+
+# 60 minuten button:
+  - platform: template
+    name: "⏰ GPA1 60min"
+    on_press:
+      - script.execute: timer_gpa1_60
+
+  - platform: template
+    name: "⏰ GPA2 60min"
+    on_press:
+      - script.execute: timer_gpa2_60
+
+  - platform: template
+    name: "⏰ GPA3 60min"
+    on_press:
+      - script.execute: timer_gpa3_60
+
+  - platform: template
+    name: "⏰ GPA4 60min"
+    on_press:
+      - script.execute: timer_gpa4_60
+
+  - platform: template
+    name: "⏰ GPA5 60min"
+    on_press:
+      - script.execute: timer_gpa5_60
+
+  - platform: template
+    name: "⏰ GPA6 60min"
+    on_press:
+      - script.execute: timer_gpa6_60
+
+  - platform: template
+    name: "⏰ GPA7 60min"
+    on_press:
+      - script.execute: timer_gpa7_60
+
+  - platform: template
+    name: "⏰ GPB0 60min"
+    on_press:
+      - script.execute: timer_gpb0_60
+
+  - platform: template
+    name: "⏰ GPB1 60min"
+    on_press:
+      - script.execute: timer_gpb1_60
+
+  - platform: template
+    name: "⏰ GPB2 60min"
+    on_press:
+      - script.execute: timer_gpb2_60
+
+  - platform: template
+    name: "⏰ GPB3 60min"
+    on_press:
+      - script.execute: timer_gpb3_60
+
+  - platform: template
+    name: "⏰ GPB4 60min"
+    on_press:
+      - script.execute: timer_gpb4_60
+
+  - platform: template
+    name: "⏰ GPB5 60min"
+    on_press:
+      - script.execute: timer_gpb5_60
+
+  - platform: template
+    name: "⏰ GPB6 60min"
+    on_press:
+      - script.execute: timer_gpb6_60
+
+  - platform: template
+    name: "⏰ GPB7 60min"
+    on_press:
+      - script.execute: timer_gpb7_60
+
+
+mcp23017:
+  - id: 'mcp23017_hub'
+    address: 0x20
+
+# COUNTER voor actieve relays (GPA1-GPB7)
+globals:
+  - id: active_relays
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+# ALL 16 OUTPUTS - EXACT MCP23017 PIN NAMEN
+switch:
+  # GPA0 MASTER (automatisch)
+#  - platform: template
+#    name: "🚀 MCP GPA0 MASTER AUTO"  # Pin 0 → Wire to GPA0 (Master power)
+#    id: gpa0_master
+#    optimistic: true
+#    icon: "mdi:power"
+#    turn_on_action:
+#      - switch.turn_on: gpa0
+#    turn_off_action:
+#      - switch.turn_off: gpa0
+
+  # GPA0 fysieke output
+  - platform: gpio
+    name: "MCP GPA0🚀"     # Pin 1  → Wire to GPA1
+    id: gpa0_master
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 0
+      mode: output
+      inverted: true
+    icon: "mdi:power"
+    
+
+  # PORT A (1-7) - Individueel + AUTO master trigger
+  - platform: gpio
+    name: "MCP GPA1"     # Pin 1  → Wire to GPA1
+    id: gpa1
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 1
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPA2"     # Pin 2  → Wire to GPA2
+    id: gpa2
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 2
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPA3"     # Pin 3  → Wire to GPA3
+    id: gpa3
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 3
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPA4"     # Pin 4  → Wire to GPA4
+    id: gpa4
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 4
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPA5"     # Pin 5  → Wire to GPA5
+    id: gpa5
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 5
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPA6"     # Pin 6  → Wire to GPA6
+    id: gpa6
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 6
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPA7"     # Pin 7  → Wire to GPA7
+    id: gpa7
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 7
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  # PORT B (8-15) - Zelfde logica
+  - platform: gpio
+    name: "MCP GPB0"     # Pin 8
+    id: gpb0
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 8
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPB1"     # Pin 9
+    id: gpb1
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 9
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPB2"     # Pin 10
+    id: gpb2
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 10
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPB3"     # Pin 11
+    id: gpb3
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 11
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPB4"     # Pin 12
+    id: gpb4
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 12
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPB5"     # Pin 13
+    id: gpb5
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 13
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPB6"     # Pin 14
+    id: gpb6
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 14
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+  - platform: gpio
+    name: "MCP GPB7"     # Pin 15
+    id: gpb7
+    restore_mode: RESTORE_DEFAULT_OFF
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: 15
+      mode: output
+      inverted: true
+    on_turn_on:
+      - script.execute: update_master
+
+    on_turn_off:
+      - script.execute: update_master
+
+
+script:
+  - id: timer_gpa1
+    mode: restart
+    then:
+      - switch.turn_on: gpa1
+      - delay: 30min
+      - switch.turn_off: gpa1
+
+  - id: timer_gpa2
+    mode: restart
+    then:
+      - switch.turn_on: gpa2
+      - delay: 30min
+      - switch.turn_off: gpa2
+
+  - id: timer_gpa3
+    mode: restart
+    then:
+      - switch.turn_on: gpa3
+      - delay: 30min
+      - switch.turn_off: gpa3
+
+  - id: timer_gpa4
+    mode: restart
+    then:
+      - switch.turn_on: gpa4
+      - delay: 30min
+      - switch.turn_off: gpa4
+
+  - id: timer_gpa5
+    mode: restart
+    then:
+      - switch.turn_on: gpa5
+      - delay: 30min
+      - switch.turn_off: gpa5
+
+  - id: timer_gpa6
+    mode: restart
+    then:
+      - switch.turn_on: gpa6
+      - delay: 30min
+      - switch.turn_off: gpa6
+
+  - id: timer_gpa7
+    mode: restart
+    then:
+      - switch.turn_on: gpa7
+      - delay: 30min
+      - switch.turn_off: gpa7
+
+  - id: timer_gpb0
+    mode: restart
+    then:
+      - switch.turn_on: gpb0
+      - delay: 30min
+      - switch.turn_off: gpb0
+
+  - id: timer_gpb1
+    mode: restart
+    then:
+      - switch.turn_on: gpb1
+      - delay: 30min
+      - switch.turn_off: gpb1
+
+  - id: timer_gpb2
+    mode: restart
+    then:
+      - switch.turn_on: gpb2
+      - delay: 30min
+      - switch.turn_off: gpb2
+
+  - id: timer_gpb3
+    mode: restart
+    then:
+      - switch.turn_on: gpb3
+      - delay: 30min
+      - switch.turn_off: gpb3
+
+  - id: timer_gpb4
+    mode: restart
+    then:
+      - switch.turn_on: gpb4
+      - delay: 30min
+      - switch.turn_off: gpb4
+
+  - id: timer_gpb5
+    mode: restart
+    then:
+      - switch.turn_on: gpb5
+      - delay: 30min
+      - switch.turn_off: gpb5
+
+  - id: timer_gpb6
+    mode: restart
+    then:
+      - switch.turn_on: gpb6
+      - delay: 30min
+      - switch.turn_off: gpb6
+
+  - id: timer_gpb7
+    mode: restart
+    then:
+      - switch.turn_on: gpb7
+      - delay: 30min
+      - switch.turn_off: gpb7      
+
+
+
+#script: 45minuten
+  - id: timer_gpa1_45
+    mode: restart
+    then:
+      - switch.turn_on: gpa1
+      - delay: 45min
+      - switch.turn_off: gpa1
+
+  - id: timer_gpa2_45
+    mode: restart
+    then:
+      - switch.turn_on: gpa2
+      - delay: 45min
+      - switch.turn_off: gpa2
+
+  - id: timer_gpa3_45
+    mode: restart
+    then:
+      - switch.turn_on: gpa3
+      - delay: 45min
+      - switch.turn_off: gpa3
+
+  - id: timer_gpa4_45
+    mode: restart
+    then:
+      - switch.turn_on: gpa4
+      - delay: 45min
+      - switch.turn_off: gpa4
+
+  - id: timer_gpa5_45
+    mode: restart
+    then:
+      - switch.turn_on: gpa5
+      - delay: 45min
+      - switch.turn_off: gpa5
+
+  - id: timer_gpa6_45
+    mode: restart
+    then:
+      - switch.turn_on: gpa6
+      - delay: 45min
+      - switch.turn_off: gpa6
+
+  - id: timer_gpa7_45
+    mode: restart
+    then:
+      - switch.turn_on: gpa7
+      - delay: 45min
+      - switch.turn_off: gpa7
+
+  - id: timer_gpb0_45
+    mode: restart
+    then:
+      - switch.turn_on: gpb0
+      - delay: 45min
+      - switch.turn_off: gpb0
+
+  - id: timer_gpb1_45
+    mode: restart
+    then:
+      - switch.turn_on: gpb1
+      - delay: 45min
+      - switch.turn_off: gpb1
+
+  - id: timer_gpb2_45
+    mode: restart
+    then:
+      - switch.turn_on: gpb2
+      - delay: 45min
+      - switch.turn_off: gpb2
+
+  - id: timer_gpb3_45
+    mode: restart
+    then:
+      - switch.turn_on: gpb3
+      - delay: 45min
+      - switch.turn_off: gpb3
+
+  - id: timer_gpb4_45
+    mode: restart
+    then:
+      - switch.turn_on: gpb4
+      - delay: 45min
+      - switch.turn_off: gpb4
+
+  - id: timer_gpb5_45
+    mode: restart
+    then:
+      - switch.turn_on: gpb5
+      - delay: 45min
+      - switch.turn_off: gpb5
+
+  - id: timer_gpb6_45
+    mode: restart
+    then:
+      - switch.turn_on: gpb6
+      - delay: 45min
+      - switch.turn_off: gpb6
+
+  - id: timer_gpb7_45
+    mode: restart
+    then:
+      - switch.turn_on: gpb7
+      - delay: 45min
+      - switch.turn_off: gpb7      
+
+#### 60 minuten script:
+  - id: timer_gpa1_60
+    mode: restart
+    then:
+      - switch.turn_on: gpa1
+      - delay: 60min
+      - switch.turn_off: gpa1
+
+  - id: timer_gpa2_60
+    mode: restart
+    then:
+      - switch.turn_on: gpa2
+      - delay: 60min
+      - switch.turn_off: gpa2
+
+  - id: timer_gpa3_60
+    mode: restart
+    then:
+      - switch.turn_on: gpa3
+      - delay: 60min
+      - switch.turn_off: gpa3
+
+  - id: timer_gpa4_60
+    mode: restart
+    then:
+      - switch.turn_on: gpa4
+      - delay: 60min
+      - switch.turn_off: gpa4
+
+  - id: timer_gpa5_60
+    mode: restart
+    then:
+      - switch.turn_on: gpa5
+      - delay: 60min
+      - switch.turn_off: gpa5
+
+  - id: timer_gpa6_60
+    mode: restart
+    then:
+      - switch.turn_on: gpa6
+      - delay: 60min
+      - switch.turn_off: gpa6
+
+  - id: timer_gpa7_60
+    mode: restart
+    then:
+      - switch.turn_on: gpa7
+      - delay: 60min
+      - switch.turn_off: gpa7
+
+  - id: timer_gpb0_60
+    mode: restart
+    then:
+      - switch.turn_on: gpb0
+      - delay: 60min
+      - switch.turn_off: gpb0
+
+  - id: timer_gpb1_60
+    mode: restart
+    then:
+      - switch.turn_on: gpb1
+      - delay: 60min
+      - switch.turn_off: gpb1
+
+  - id: timer_gpb2_60
+    mode: restart
+    then:
+      - switch.turn_on: gpb2
+      - delay: 60min
+      - switch.turn_off: gpb2
+
+  - id: timer_gpb3_60
+    mode: restart
+    then:
+      - switch.turn_on: gpb3
+      - delay: 60min
+      - switch.turn_off: gpb3
+
+  - id: timer_gpb4_60
+    mode: restart
+    then:
+      - switch.turn_on: gpb4
+      - delay: 60min
+      - switch.turn_off: gpb4
+
+  - id: timer_gpb5_60
+    mode: restart
+    then:
+      - switch.turn_on: gpb5
+      - delay: 60min
+      - switch.turn_off: gpb5
+
+  - id: timer_gpb6_60
+    mode: restart
+    then:
+      - switch.turn_on: gpb6
+      - delay: 60min
+      - switch.turn_off: gpb6
+
+  - id: timer_gpb7_60
+    mode: restart
+    then:
+      - switch.turn_on: gpb7
+      - delay: 60min
+      - switch.turn_off: gpb7
+
+#script:
+  - id: update_master
+    then:
+      - if:
+          condition:
+            or:
+              - switch.is_on: gpa1
+              - switch.is_on: gpa2
+              - switch.is_on: gpa3
+              - switch.is_on: gpa4
+              - switch.is_on: gpa5
+              - switch.is_on: gpa6
+              - switch.is_on: gpa7
+              - switch.is_on: gpb0
+              - switch.is_on: gpb1
+              - switch.is_on: gpb2
+              - switch.is_on: gpb3
+              - switch.is_on: gpb4
+              - switch.is_on: gpb5
+              - switch.is_on: gpb6
+              - switch.is_on: gpb7
+          then:
+            - switch.turn_on: gpa0_master
+          else:
+            - switch.turn_off: gpa0_master      
